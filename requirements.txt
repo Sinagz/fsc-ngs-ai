@@ -1,0 +1,10 @@
+pymupdf
+pymupdf4llm
+python-docx
+pydantic
+pandas
+sqlalchemy
+python-dotenv
+openai
+rapidfuzz
+numpy
