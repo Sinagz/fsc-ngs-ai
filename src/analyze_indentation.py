@@ -7,7 +7,7 @@ LAYOUT_JSON = BASE_DIR / "data" / "extracted" / "raw_layout" / "layout_lines.jso
 
 
 def bucket_x0(x0, bucket_size=5):
-    return round(x0 / bucket_size) * bucket_size
+    return round(x0 / bucket_size) * bucket_size 
 
 
 def main():
