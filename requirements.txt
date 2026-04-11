@@ -18,6 +18,6 @@ pandas>=2.0
 numpy>=1.26
 pydantic>=2.0
 
-# Optional — for future LLM integration
-# openai>=1.0        # uncomment when API key is available
-# python-dotenv>=1.0
+# Mistral OCR extraction
+mistralai>=2.0
+python-dotenv>=1.0

@@ -18,13 +18,13 @@ DATA = ROOT / "data"
 
 STEPS = [
     {
-        "name":   "Extract PDFs to layout JSON",
-        "script": "src/extract_pdfs.py",
-        "output": DATA / "extracted" / "raw_layout" / "on_layout.json",
+        "name":   "Extract fee codes via Mistral OCR (sliding window)",
+        "script": "src/extract_mistral.py",
+        "output": DATA / "extracted" / "mistral" / "on_codes.json",
     },
     {
-        "name":   "Parse fee codes from all provinces",
-        "script": "src/parse_all_provinces.py",
+        "name":   "Parse Mistral output to standard fee code schema",
+        "script": "src/parse_mistral.py",
         "output": DATA / "parsed" / "fee_codes" / "all_fee_codes.json",
     },
     {
