@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.env
+
+# Raw source files (large PDFs and DOCXs — not committed)
+data/raw/
+
+# Intermediate extracted layout JSON (large, reproducible)
+data/extracted/
+
+# SQLite database
+db/
+
+# Parsed data — commit only the final mapped JSON
+data/parsed/fee_codes/
+data/parsed/ngs/
+data/parsed/fsc_ngs_cross_province.json
+
+# Embeddings (33 MB, regenerate with: python src/build_embeddings.py)
+data/parsed/embeddings.npz
+
+# Keep the main app database
+!data/parsed/fsc_ngs_mapped.json
+
+# Output Excel files
+data/output/
+
+# Input anchor codes (user-specific)
+data/input/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Streamlit
+.streamlit/secrets.toml
