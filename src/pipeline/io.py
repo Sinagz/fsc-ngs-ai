@@ -21,22 +21,23 @@ def pdf_hash(path: Path) -> str:
 def load_pdf(path: Path) -> list[PageBlock]:
     """Load all text blocks from a PDF with layout and font metadata."""
     blocks: list[PageBlock] = []
-    doc = fitz.open(str(path))
-    try:
+    with fitz.open(str(path)) as doc:
         for page_idx, page in enumerate(doc, start=1):
             data = page.get_text("dict")
             for block in data.get("blocks", []):
                 for line in block.get("lines", []):
                     for span in line.get("spans", []):
                         text = (span.get("text") or "").strip()
-                        if not text:
+                        size = float(span.get("size") or 0.0)
+                        if not text or size <= 0:
                             continue
-                        bbox = span.get("bbox", (0, 0, 0, 0))
+                        bbox = span.get("bbox")
+                        if bbox is None:
+                            continue
+                        x0, y0, x1, y1 = bbox
                         blocks.append(PageBlock(
                             page=page_idx, text=text,
-                            x0=bbox[0], y0=bbox[1], x1=bbox[2], y1=bbox[3],
-                            font=span.get("font", ""), size=float(span.get("size", 0.0)),
+                            x0=x0, y0=y0, x1=x1, y1=y1,
+                            font=span.get("font", ""), size=size,
                         ))
-    finally:
-        doc.close()
     return blocks

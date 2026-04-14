@@ -1,4 +1,3 @@
-import hashlib
 import fitz  # pymupdf
 
 from src.pipeline.io import load_pdf, pdf_hash
@@ -19,6 +18,11 @@ def test_load_pdf_returns_page_blocks(tmp_path):
     assert len(blocks) >= 1
     assert blocks[0].page == 1
     assert "K040" in blocks[0].text
+    block = blocks[0]
+    assert block.x0 > 0, "x0 should reflect actual span position"
+    assert block.y0 > 0, "y0 should reflect actual span position"
+    assert block.size > 0, "font size should be positive"
+    assert block.font != "", "font name should be populated"
 
 
 def test_pdf_hash_is_stable(tmp_path):
