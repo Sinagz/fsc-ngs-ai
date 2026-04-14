@@ -97,5 +97,6 @@ def rescue(
             "fsc_description": out.fsc_description or row.fsc_description,
             "price": price if price is not None else row.price,
             "confidence": out.confidence,
+            "origin": "semantic",
         }))
     return rescued, unresolved

@@ -20,6 +20,8 @@ def test_rescue_skips_rows_above_threshold():
     assert rescued == [row]
     assert unresolved == []
     client.chat_json.assert_not_called()
+    # Pass-through row keeps its default origin.
+    assert rescued[0].origin == "structural"
 
 
 def test_rescue_calls_llm_for_low_confidence():
@@ -36,6 +38,8 @@ def test_rescue_calls_llm_for_low_confidence():
     assert rescued[0].fsc_description == "General periodic visit, adult."
     assert rescued[0].price == Decimal("78.45")
     assert unresolved == []
+    # Rescued row should be labelled with semantic origin for downstream validator.
+    assert rescued[0].origin == "semantic"
 
 
 def test_rescue_logs_unresolved():

@@ -41,6 +41,7 @@ class CandidateRow(BaseModel):
     page: int
     source_pdf_hash: str
     confidence: float = Field(ge=0.0, le=1.0)
+    origin: ExtractionMethod = "structural"
 
 
 class FeeCodeRecord(BaseModel):
