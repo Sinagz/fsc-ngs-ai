@@ -44,7 +44,55 @@ Enter one FSC code from one province (e.g. `K040` from Ontario) and get the clos
 
 Raw provincial PDFs → structured extraction → LLM rescue for ambiguous rows → validation → NGS mapping → OpenAI embeddings → versioned artifacts.
 
-![Pipeline data flow](docs/diagrams/pipeline.svg)
+```mermaid
+flowchart TD
+    subgraph raw["data/raw/"]
+        PDFs["PDFs<br/>(ON, BC, YT fee schedules)"]
+        DOCX["DOCX<br/>(CIHI NGS reference)"]
+    end
+
+    subgraph pipeline["src/pipeline/ — offline"]
+        IO["io.load_pdf<br/><i>pymupdf</i>"]
+        STRUCT["structural/{ontario,bc,yukon}<br/>confidence ∈ [0,1]"]
+        RESCUE{{"confidence &lt; 0.8?"}}
+        LLM["semantic.rescue<br/><i>gpt-4o-mini</i>"]
+        VAL["validate<br/>regex + dedupe + price"]
+        NGSP["ngs_parser<br/>DOCX → NGSRecord"]
+        NGSM["ngs_mapper<br/>exact / semantic+LLM"]
+        EMB["embed<br/><i>text-embedding-3-large</i><br/>L2-normalised"]
+        REG["regression<br/>diff vs prior version"]
+    end
+
+    subgraph out["data/parsed/v&lt;DATE&gt;/"]
+        CODES["codes.json"]
+        NPZ["embeddings.npz"]
+        MAN["manifest.json"]
+    end
+
+    DIAG[("data/diagnostics/&lt;DATE&gt;/<br/>unresolved.jsonl<br/>costs.json")]
+
+    PDFs --> IO --> STRUCT --> RESCUE
+    RESCUE -- yes --> LLM --> VAL
+    RESCUE -- no --> VAL
+    DOCX --> NGSP --> NGSM
+    VAL --> NGSM --> EMB --> REG
+    REG --> CODES & NPZ & MAN
+    LLM -.->|unresolved| DIAG
+    NGSM -.->|verdicts| DIAG
+    EMB -.->|token costs| DIAG
+
+    classDef raw fill:#fff4cc,stroke:#b8860b,color:#000
+    classDef pipe fill:#dbeafe,stroke:#2563eb,color:#000
+    classDef llm fill:#ede9fe,stroke:#7c3aed,color:#000
+    classDef output fill:#dcfce7,stroke:#16a34a,color:#000
+    classDef diag fill:#fee2e2,stroke:#dc2626,color:#000
+
+    class PDFs,DOCX raw
+    class IO,STRUCT,VAL,NGSP,NGSM,EMB,REG pipe
+    class LLM,RESCUE llm
+    class CODES,NPZ,MAN output
+    class DIAG diag
+```
 
 The pipeline is **idempotent** (skip-if-output-exists, `--force` to redo) and **resumable** (every OpenAI call is disk-cached by request body, so re-runs cost nothing). A regression gate compares each new run to the previous version and fails loud on a ≥5% code-count drop or a missing golden-set code.
 
@@ -100,7 +148,42 @@ Open `http://localhost:8501`.
 
 The Streamlit app imports from `src/core/` and reads the newest `data/parsed/v<DATE>/` bundle once (cached for the process via `@st.cache_resource`). Nothing at runtime touches PDFs, DOCXs, or OpenAI.
 
-![Runtime architecture](docs/diagrams/runtime.svg)
+```mermaid
+flowchart LR
+    User(["User<br/>browser"])
+
+    subgraph app["app/ — Streamlit"]
+        UI["main.py<br/><i>UI + st.cache_resource</i>"]
+        XLSX["excel_export.py<br/><i>openpyxl</i>"]
+    end
+
+    subgraph core["src/core/ — runtime"]
+        LOAD["loader.load_latest<br/>newest v&lt;DATE&gt;/"]
+        MATCH["matching.search<br/>cosine → Jaccard fallback"]
+    end
+
+    subgraph data["data/parsed/v&lt;DATE&gt;/"]
+        C["codes.json"]
+        E["embeddings.npz"]
+        M["manifest.json"]
+    end
+
+    User --> UI --> MATCH
+    UI --> XLSX
+    LOAD --> UI
+    C & E & M --> LOAD
+    MATCH <--> LOAD
+
+    classDef userNode fill:#fef3c7,stroke:#ca8a04,color:#000
+    classDef appNode fill:#dbeafe,stroke:#2563eb,color:#000
+    classDef coreNode fill:#e0e7ff,stroke:#4338ca,color:#000
+    classDef dataNode fill:#dcfce7,stroke:#16a34a,color:#000
+
+    class User userNode
+    class UI,XLSX appNode
+    class LOAD,MATCH coreNode
+    class C,E,M dataNode
+```
 
 **Two search paths, auto-selected:**
 - **Semantic** (preferred) — cosine similarity over L2-normalised OpenAI embeddings. A single matrix-vector dot product per query.
@@ -114,7 +197,49 @@ Both paths rank purely by description similarity. **Same-NGS is flagged but does
 
 Every structural extractor assigns an explicit confidence band to each candidate row. Rows below 0.8 are automatically routed to `gpt-4o-mini` with the surrounding 5 lines of PDF context. The LLM either fills in the missing fields or marks the row unresolved (which lands in `data/diagnostics/<DATE>/unresolved.jsonl` for audit).
 
-![Confidence routing](docs/diagrams/confidence-routing.svg)
+```mermaid
+flowchart TD
+    ROW["Candidate row<br/>from PDF"]
+    CONF{"Assign<br/>confidence band"}
+
+    H["1.0 HIGH<br/>all fields matched"]
+    A["0.85 ADJACENT<br/>field from next line"]
+    M["0.6 MISSING<br/>price or desc missing"]
+    AM["0.3 AMBIGUOUS<br/>looks like header"]
+    R["0.0 REJECT<br/>parser rejects"]
+
+    GATE{"confidence<br/>≥ 0.8 ?"}
+    LLM["gpt-4o-mini rescue<br/>+ 5 lines context"]
+    RESOLVED{"LLM resolved?"}
+
+    VALID["validate<br/>regex + dedupe + price"]
+    UNRES[("diagnostics/<br/>unresolved.jsonl")]
+    DROP["dropped"]
+
+    ROW --> CONF
+    CONF --> H & A & M & AM & R
+    H --> GATE
+    A --> GATE
+    M --> GATE
+    AM --> GATE
+    R --> DROP
+    GATE -- yes --> VALID
+    GATE -- no --> LLM --> RESOLVED
+    RESOLVED -- yes --> VALID
+    RESOLVED -- no --> UNRES
+
+    classDef high fill:#dcfce7,stroke:#16a34a,color:#000
+    classDef mid fill:#fef9c3,stroke:#ca8a04,color:#000
+    classDef low fill:#fee2e2,stroke:#dc2626,color:#000
+    classDef proc fill:#dbeafe,stroke:#2563eb,color:#000
+    classDef llm fill:#ede9fe,stroke:#7c3aed,color:#000
+
+    class H,A high
+    class M,AM mid
+    class R,DROP,UNRES low
+    class ROW,CONF,GATE,VALID proc
+    class LLM,RESOLVED llm
+```
 
 | Confidence | Meaning | Routed to |
 |---|---|---|
@@ -157,7 +282,6 @@ fsc-ngs-ai/
 │   └── parsed/v<DATE>/        # Versioned artifacts
 ├── tests/                     # unit / integration / property / regression
 ├── docs/
-│   ├── diagrams/              # Mermaid-rendered SVGs (used in this README)
 │   └── superpowers/           # Design spec + implementation plan
 └── requirements.txt
 ```
