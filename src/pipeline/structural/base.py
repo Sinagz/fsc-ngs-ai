@@ -36,12 +36,18 @@ def group_by_page(blocks: list[PageBlock]) -> dict[int, list[PageBlock]]:
 
 
 def is_section_header(block: PageBlock, *, body_size: float, tolerance: float = 0.5) -> bool:
+    """Row-level check: True if this block's font is large enough to look like a header
+    relative to known body text size. Use while walking a page when body_size is known.
+    Effective cutoff at default tolerance: block.size >= body_size + 1.0."""
     return block.size >= body_size + 1.5 - tolerance and len(block.text) >= 3
 
 
 def detect_section_headers(
     blocks: list[PageBlock], *, header_size: float, tolerance: float = 0.3
 ) -> list[tuple[int, str]]:
+    """Bulk scan: return (page, text) for every block whose font size matches
+    `header_size` exactly (within `tolerance`). Use when the header font size is
+    known a priori from the PDF's styling conventions."""
     return [
         (b.page, b.text)
         for b in blocks

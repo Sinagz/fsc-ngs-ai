@@ -34,6 +34,14 @@ def test_is_section_header_detects_large_font():
     assert not is_section_header(_blk(1, "K040", size=10.0), body_size=10.0)
 
 
+def test_is_section_header_boundary():
+    # body=10.0, default tolerance=0.5 → effective cutoff at size >= 11.0
+    assert is_section_header(_blk(1, "HDR", size=11.0), body_size=10.0)
+    assert not is_section_header(_blk(1, "HDR", size=10.9), body_size=10.0)
+    # Text must be at least 3 chars
+    assert not is_section_header(_blk(1, "AB", size=14.0), body_size=10.0)
+
+
 def test_detect_section_headers_emits_pairs():
     blocks = [
         _blk(1, "CHAPTER A", size=14, y=50),
