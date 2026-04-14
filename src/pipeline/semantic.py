@@ -50,7 +50,12 @@ def rescue(
     threshold: float = 0.8,
 ) -> tuple[list[CandidateRow], list[CandidateRow]]:
     """Return (rescued_rows, unresolved_rows).
-    Rows with confidence >= threshold pass through unchanged."""
+
+    Rows with confidence >= threshold pass through unchanged. Rows with
+    empty context are routed directly to unresolved without an API call.
+    Client exceptions are caught and the row is routed to unresolved; the
+    pipeline continues.
+    """
     rescued: list[CandidateRow] = []
     unresolved: list[CandidateRow] = []
     for row in rows:
@@ -58,14 +63,24 @@ def rescue(
             rescued.append(row)
             continue
 
-        context = context_lines.get((row.page, row.fsc_code), "")
+        raw_context = context_lines.get((row.page, row.fsc_code), "")
+        if not raw_context:
+            unresolved.append(row)
+            continue
+
+        safe_context = raw_context.replace("{", "{{").replace("}", "}}")
         prompt = USER_TEMPLATE.format(
-            province=row.province, code=row.fsc_code, page=row.page, context=context
+            province=row.province, code=row.fsc_code, page=row.page, context=safe_context
         )
-        out = client.chat_json(
-            prompt=prompt, schema=RescueOutput, model=model,
-            system=SYSTEM_PROMPT, temperature=0.0,
-        )
+        try:
+            out = client.chat_json(
+                prompt=prompt, schema=RescueOutput, model=model,
+                system=SYSTEM_PROMPT, temperature=0.0,
+            )
+        except Exception:  # noqa: BLE001 — any client failure means the row can't be rescued
+            unresolved.append(row)
+            continue
+
         if not out.resolved:
             unresolved.append(row)
             continue
@@ -78,9 +93,9 @@ def rescue(
                 price = None
 
         rescued.append(row.model_copy(update={
-            "fsc_fn": out.fsc_fn,
-            "fsc_description": out.fsc_description,
-            "price": price,
-            "confidence": max(row.confidence, out.confidence),
+            "fsc_fn": out.fsc_fn or row.fsc_fn,
+            "fsc_description": out.fsc_description or row.fsc_description,
+            "price": price if price is not None else row.price,
+            "confidence": out.confidence,
         }))
     return rescued, unresolved
