@@ -7,9 +7,9 @@ pydantic>=2.7
 python-dotenv>=1.0
 
 # OpenAI (extraction rescue, embeddings, reranking in Phase 2)
-openai>=1.30
+openai>=1.30,<2
 httpx>=0.27
-hishel>=0.0.30
+hishel>=1.0
 
 # CLI
 typer>=0.12
