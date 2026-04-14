@@ -71,7 +71,7 @@ data/raw/pdf/*.pdf             data/raw/docx/*.docx
         ▼ structural/{ontario,bc,yukon} extractors
    CandidateRow + confidence ∈ [0,1]
         │
-        ▼ semantic.rescue (gpt-4o-mini, only for confidence < 0.8)
+        ▼ semantic.rescue (gpt-5.4-mini, only for confidence < 0.8)
    CandidateRow (origin="structural" or "semantic")
         │
         ▼ validate (province regex, dedupe, positive price)

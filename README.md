@@ -55,7 +55,7 @@ flowchart TD
         IO["io.load_pdf<br/><i>pymupdf</i>"]
         STRUCT["structural/{ontario,bc,yukon}<br/>confidence ∈ [0,1]"]
         RESCUE{{"confidence &lt; 0.8?"}}
-        LLM["semantic.rescue<br/><i>gpt-4o-mini</i>"]
+        LLM["semantic.rescue<br/><i>gpt-5.4-mini</i>"]
         VAL["validate<br/>regex + dedupe + price"]
         NGSP["ngs_parser<br/>DOCX → NGSRecord"]
         NGSM["ngs_mapper<br/>exact / semantic+LLM"]
@@ -119,7 +119,8 @@ Optional overrides (defaults shown):
 ```bash
 OPENAI_EMBED_MODEL=text-embedding-3-large
 OPENAI_EMBED_DIM=1024
-OPENAI_EXTRACT_MODEL=gpt-4o-mini
+OPENAI_EXTRACT_MODEL=gpt-5.4-mini
+OPENAI_RERANK_MODEL=gpt-5.4-mini  # Phase 2
 ```
 
 ### 3. Build the database
@@ -195,7 +196,7 @@ Both paths rank purely by description similarity. **Same-NGS is flagged but does
 
 ## Extraction: how ambiguous rows get rescued
 
-Every structural extractor assigns an explicit confidence band to each candidate row. Rows below 0.8 are automatically routed to `gpt-4o-mini` with the surrounding 5 lines of PDF context. The LLM either fills in the missing fields or marks the row unresolved (which lands in `data/diagnostics/<DATE>/unresolved.jsonl` for audit).
+Every structural extractor assigns an explicit confidence band to each candidate row. Rows below 0.8 are automatically routed to `gpt-5.4-mini` with the surrounding 5 lines of PDF context. The LLM either fills in the missing fields or marks the row unresolved (which lands in `data/diagnostics/<DATE>/unresolved.jsonl` for audit).
 
 ```mermaid
 flowchart TD
@@ -209,7 +210,7 @@ flowchart TD
     R["0.0 REJECT<br/>parser rejects"]
 
     GATE{"confidence<br/>≥ 0.8 ?"}
-    LLM["gpt-4o-mini rescue<br/>+ 5 lines context"]
+    LLM["gpt-5.4-mini rescue<br/>+ 5 lines context"]
     RESOLVED{"LLM resolved?"}
 
     VALID["validate<br/>regex + dedupe + price"]
@@ -265,7 +266,7 @@ fsc-ngs-ai/
 │   │   ├── schema.py            # Canonical pydantic models (single source of truth)
 │   │   ├── io.py                # pymupdf loader
 │   │   ├── structural/          # Per-province extractors (ontario/bc/yukon)
-│   │   ├── semantic.py          # gpt-4o-mini rescue
+│   │   ├── semantic.py          # gpt-5.4-mini rescue
 │   │   ├── validate.py          # Province regex + dedupe + price gate
 │   │   ├── ngs_parser.py        # DOCX → NGSRecord
 │   │   ├── ngs_mapper.py        # FSC → NGS (exact / semantic / LLM verdict)
@@ -325,7 +326,7 @@ Integration and regression tests skip cleanly when there are no `data/parsed/v*/
 | App startup | ~2 sec | $0 (offline) |
 | Single lookup query | <100 ms | $0 (offline) |
 
-All OpenAI dollars come from structural-rescue (`gpt-4o-mini`) + embeddings + NGS verdicts during the pipeline build. The runtime lookup path never calls OpenAI in Phase 1.
+All OpenAI dollars come from structural-rescue (`gpt-5.4-mini`) + embeddings + NGS verdicts during the pipeline build. The runtime lookup path never calls OpenAI in Phase 1.
 
 ---
 
@@ -333,7 +334,7 @@ All OpenAI dollars come from structural-rescue (`gpt-4o-mini`) + embeddings + NG
 
 Phase 1 (**done** — this repo) is the rebuilt pipeline with OpenAI embeddings and no GPU/Mistral dependencies.
 
-- **Phase 2** — `gpt-4o` reranker over top-20 retrieval with structured rationale and confidence per match.
+- **Phase 2** — `gpt-5.4-mini` reranker over top-20 retrieval with structured rationale and confidence per match.
 - **Phase 3** — streamed rationale generation, natural-language search ("knee arthroscopy with meniscus repair" → codes), "why not X?" drill-downs.
 - **Phase 4** — FastAPI service wrapping `src/core/`, SQLite/DuckDB storage, Docker.
 - Additional provinces (AB, QC, NS, ...).

@@ -38,7 +38,7 @@ class PipelineConfig:
     accept_regression: str | None = None
     embed_model: str = "text-embedding-3-large"
     embed_dim: int = 1024
-    extract_model: str = "gpt-4o-mini"
+    extract_model: str = "gpt-5.4-mini"
     golden_set: frozenset[tuple[str, str]] = field(default_factory=frozenset)
 
 

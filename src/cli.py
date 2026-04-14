@@ -51,7 +51,7 @@ def run(
     """Run the full extraction → mapping → embedding pipeline."""
     load_dotenv()
     embed_model = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-large")
-    extract_model = os.environ.get("OPENAI_EXTRACT_MODEL", "gpt-4o-mini")
+    extract_model = os.environ.get("OPENAI_EXTRACT_MODEL", "gpt-5.4-mini")
     if embed_dim is None:
         embed_dim = int(os.environ.get("OPENAI_EMBED_DIM", "1024"))
 
