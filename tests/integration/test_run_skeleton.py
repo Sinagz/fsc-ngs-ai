@@ -36,3 +36,7 @@ def test_pipeline_skips_completed_steps(tmp_path: Path, monkeypatch):
     # Should no-op; force=False and artifacts exist
     result = run_pipeline(cfg, client=None)
     assert result.skipped is True
+    # Verify the skip is a true no-op — no side effects
+    assert not cfg.diagnostics_dir.exists(), (
+        "skip path must not create diagnostics dir"
+    )

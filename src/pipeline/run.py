@@ -6,7 +6,6 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from src.openai_client import OpenAIClient
 from src.pipeline.embed import build_embeddings, save_npz
@@ -59,18 +58,18 @@ def _git_sha() -> str:
         return "unknown"
 
 
-def _province_pdf(dir: Path, province: str) -> Path | None:
+def _province_pdf(pdf_dir: Path, province: str) -> Path | None:
     patterns = {
         "ON": "moh-schedule-benefit-*.pdf",
         "BC": "msc_payment_schedule_*.pdf",
         "YT": "yukon_physician_fee_guide_*.pdf",
     }
-    hits = sorted(dir.glob(patterns[province]))
+    hits = sorted(pdf_dir.glob(patterns[province]))
     return hits[-1] if hits else None
 
 
 def run_pipeline(
-    cfg: PipelineConfig, *, client: Optional[OpenAIClient]
+    cfg: PipelineConfig, *, client: OpenAIClient | None
 ) -> PipelineResult:
     version_dir = cfg.output_dir / f"v{cfg.version}"
     codes_path = version_dir / "codes.json"
@@ -85,6 +84,11 @@ def run_pipeline(
 
     version_dir.mkdir(parents=True, exist_ok=True)
     cfg.diagnostics_dir.mkdir(parents=True, exist_ok=True)
+
+    # Clear diagnostics from any prior run so a --force re-run doesn't silently
+    # concatenate this run's output with stale rows.
+    for name in ("unresolved.jsonl", "validation_rejects.jsonl"):
+        (cfg.diagnostics_dir / name).unlink(missing_ok=True)
 
     # Extract + rescue per province
     all_candidates = []
@@ -135,6 +139,9 @@ def run_pipeline(
         llm_model=cfg.extract_model,
         dim=cfg.embed_dim,
     )
+    # Sort once here. codes.json and embeddings.npz are written with positional
+    # correspondence (row i in codes.json == row i in .npz). Any filter or reorder
+    # AFTER this point and BEFORE build_embeddings() would silently desync the two.
     records.sort(key=lambda r: (r.province, r.fsc_code))
 
     # Embeddings
