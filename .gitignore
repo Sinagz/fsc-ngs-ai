@@ -53,3 +53,6 @@ data/parsed/v*/embeddings.npz
 htmlcov/
 .coverage
 
+
+# Hypothesis cache
+.hypothesis/
