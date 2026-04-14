@@ -1,0 +1,446 @@
+[
+  {
+    "province": "ON",
+    "fsc_code": "E611"
+  },
+  {
+    "province": "ON",
+    "fsc_code": "P045",
+    "expected_description_contains": [
+      "include",
+      "repair"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "X498",
+    "expected_description_contains": [
+      "another",
+      "plane"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "Z636",
+    "expected_description_contains": [
+      "eligible",
+      "payment"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "E706"
+  },
+  {
+    "province": "ON",
+    "fsc_code": "J708"
+  },
+  {
+    "province": "ON",
+    "fsc_code": "W074",
+    "expected_description_contains": [
+      "nursing",
+      "homes"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "G203",
+    "expected_description_contains": [
+      "maximum"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "J200",
+    "expected_description_contains": [
+      "requires",
+      "minimum"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "E673",
+    "expected_description_contains": [
+      "payable",
+      "lysis"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "J023",
+    "expected_description_contains": [
+      "claim",
+      "appropriate"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "E862",
+    "expected_description_contains": [
+      "performed",
+      "laparoscopically"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "E651",
+    "expected_description_contains": [
+      "multiple",
+      "complex"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "N506",
+    "expected_description_contains": [
+      "lumbar",
+      "includes"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "Z152",
+    "expected_description_contains": [
+      "general",
+      "preamble"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "E922"
+  },
+  {
+    "province": "ON",
+    "fsc_code": "K003",
+    "expected_description_contains": [
+      "limited",
+      "rendered"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "G866",
+    "expected_description_contains": [
+      "treatment",
+      "maximum"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "A933",
+    "expected_description_contains": [
+      "eligible",
+      "payment"
+    ]
+  },
+  {
+    "province": "ON",
+    "fsc_code": "E642"
+  },
+  {
+    "province": "BC",
+    "fsc_code": "33272",
+    "expected_description_contains": [
+      "where",
+      "consultation"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "33583",
+    "expected_description_contains": [
+      "include",
+      "administration"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "33089",
+    "expected_description_contains": [
+      "billed",
+      "supporting"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "00084",
+    "expected_description_contains": [
+      "payment",
+      "travelling"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "22399",
+    "expected_description_contains": [
+      "included"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "T25317",
+    "expected_description_contains": [
+      "frontal",
+      "recess"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "SY00715",
+    "expected_description_contains": [
+      "proctosigmoidoscopy",
+      "examination"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "P14562",
+    "expected_description_contains": [
+      "restricted",
+      "family"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "60610",
+    "expected_description_contains": [
+      "diagnostic",
+      "interview"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "P43000",
+    "expected_description_contains": [
+      "consist",
+      "examination"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "83070",
+    "expected_description_contains": [
+      "include",
+      "pertinent"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "00235",
+    "expected_description_contains": [
+      "qualifying",
+      "laser"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "33424",
+    "expected_description_contains": [
+      "where",
+      "consultation"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "P34105",
+    "expected_description_contains": [
+      "percutaneous",
+      "radiofrequency"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "55768",
+    "expected_description_contains": [
+      "fracture",
+      "intertrochanteric"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "P01210",
+    "expected_description_contains": [
+      "hours",
+      "hours"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "77012",
+    "expected_description_contains": [
+      "apply",
+      "where"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "04007",
+    "expected_description_contains": [
+      "gynecology",
+      "visits"
+    ]
+  },
+  {
+    "province": "BC",
+    "fsc_code": "57998"
+  },
+  {
+    "province": "BC",
+    "fsc_code": "07963"
+  },
+  {
+    "province": "YT",
+    "fsc_code": "7845",
+    "expected_description_contains": [
+      "implantation",
+      "temporary"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "0104",
+    "expected_description_contains": [
+      "visits",
+      "visit"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "3312",
+    "expected_description_contains": [
+      "where",
+      "consultation"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "4010",
+    "expected_description_contains": [
+      "include",
+      "complete"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "2042",
+    "expected_description_contains": [
+      "either",
+      "field"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "6169"
+  },
+  {
+    "province": "YT",
+    "fsc_code": "5",
+    "expected_description_contains": [
+      "resuscitative",
+      "procedures"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "0140",
+    "expected_description_contains": [
+      "charged",
+      "scheduled"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "0042",
+    "expected_description_contains": [
+      "clinical",
+      "telephone"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "1710",
+    "expected_description_contains": [
+      "consist",
+      "examination"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "0312",
+    "expected_description_contains": [
+      "where",
+      "consultation"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "0359",
+    "expected_description_contains": [
+      "other",
+      "situations"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "2528",
+    "expected_description_contains": [
+      "control",
+      "total"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "8628",
+    "expected_description_contains": [
+      "charged",
+      "those"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "1038",
+    "expected_description_contains": [
+      "units"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "3313",
+    "expected_description_contains": [
+      "consist",
+      "examination"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "4013",
+    "expected_description_contains": [
+      "request",
+      "primary"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "2198",
+    "expected_description_contains": [
+      "intended",
+      "cases"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "6122",
+    "expected_description_contains": [
+      "fractures"
+    ]
+  },
+  {
+    "province": "YT",
+    "fsc_code": "6+T",
+    "expected_description_contains": [
+      "resuscitative",
+      "procedures"
+    ]
+  }
+]
