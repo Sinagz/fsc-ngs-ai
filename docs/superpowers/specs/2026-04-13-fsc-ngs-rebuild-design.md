@@ -43,7 +43,7 @@ def search(
 
 This signature is stable across the CLI, Streamlit UI, and (Phase 4) FastAPI service. `with_rationale=False` keeps the fast retrieval-only path; `True` enables the Phase 2 LLM reranker with streamed explanations.
 
-Phase 1 ships a stub implementation that delegates to the existing `app/lookup_engine.py` logic so the app keeps working while the pipeline is rebuilt underneath.
+Phase 1 ports the existing cosine-similarity + Jaccard-fallback algorithm into `src/core/matching.py`, reading the new versioned artifacts via `src/core/loader.py`. The old `app/lookup_engine.py` is deleted; `app/main.py` updates its imports. This is a port, not an algorithm change — Phase 1 preserves current matching behaviour so the app keeps working, and Phase 2 replaces the algorithm with OpenAI-embedding retrieval + `gpt-4o` reranking.
 
 ### Contract C — Config via `.env` only
 
@@ -323,8 +323,8 @@ These are the continuous feedback signal. A human skims them periodically; they 
 
 ### 4.5 What is explicitly NOT in Phase 1 (YAGNI)
 
-- **No matching improvements.** `src/core/matching.py` ships a Phase 1 stub that delegates to the current `app/lookup_engine.py` logic so the app keeps working. Phase 2 replaces it.
-- **No UI changes.** Streamlit app swap-in is limited to import-path updates and a sidebar caption.
+- **No matching-algorithm improvements.** Phase 1 ports the current cosine + Jaccard logic into `src/core/matching.py` (reading the new versioned artifacts) and deletes `app/lookup_engine.py`. Same algorithm, new location, new data contract. Phase 2 replaces the algorithm.
+- **No UI changes.** Streamlit app swap-in is limited to import-path updates (`from app.lookup_engine` → `from src.core.matching`) and a sidebar caption noting the new embedding source.
 - **No FastAPI, no DuckDB, no Docker.** Phase 4.
 - **No rationale generation in match results.** Phase 2.
 - **No new provinces.** Schema supports them via the `Province` Literal union; adding AB or QC is a pure extractor addition in a later project.
