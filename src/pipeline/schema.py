@@ -13,7 +13,7 @@ NGSMethod = Literal["exact", "llm", "manual"]
 
 class PageBlock(BaseModel):
     """One pymupdf text block with layout metadata."""
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     page: int
     text: str
@@ -74,11 +74,11 @@ class NGSRecord(BaseModel):
     ngs_code: str
     ngs_label: str
     ngs_description: str = ""
-    code_refs: list[str] = Field(default_factory=list)
+    code_refs: tuple[str, ...] = Field(default_factory=tuple)
 
 
 class Manifest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     schema_version: Literal["1"] = "1"
     generated_at: str
