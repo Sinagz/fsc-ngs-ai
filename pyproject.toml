@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "unit: fast isolated tests",
+    "integration: hit local files / small PDF fixtures",
+    "regression: snapshot-based, fails on data drift",
+    "property: hypothesis-based property tests",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
