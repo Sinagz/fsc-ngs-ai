@@ -25,6 +25,19 @@ def _record_text(r: FeeCodeRecord) -> str:
 def build_embeddings(
     records: list[FeeCodeRecord], *, client: _ClientLike, model: str, dim: int,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Build L2-normalized OpenAI embeddings for the given records.
+
+    Returns (embeddings, record_ids) where:
+    - embeddings is an (N, dim) float32 array with unit-norm rows
+    - record_ids is an (N,) int32 array of positional indices into the input list
+
+    IMPORTANT: record_ids are positional indices, not fsc_code lookups. The caller
+    must persist `records` in the exact same order when reading the embeddings file;
+    sorting or filtering `records` between build_embeddings() and consumers silently
+    desynchronizes the .npz from the source data.
+    """
+    if not records:
+        return np.zeros((0, dim), dtype=np.float32), np.zeros((0,), dtype=np.int32)
     texts = [_record_text(r) for r in records]
     vecs = client.embed(texts, model=model, dim=dim)
     arr = np.asarray(vecs, dtype=np.float32)

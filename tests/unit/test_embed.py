@@ -33,3 +33,14 @@ def test_npz_roundtrip(tmp_path: Path):
     arr2, ids2 = load_npz(out)
     np.testing.assert_array_equal(arr, arr2)
     np.testing.assert_array_equal(ids, ids2)
+
+
+def test_build_embeddings_empty_records():
+    """Empty input should return zero-shape arrays, not crash."""
+    client = MagicMock()
+    arr, ids = build_embeddings([], client=client, model="m", dim=8)
+    assert arr.shape == (0, 8)
+    assert arr.dtype == np.float32
+    assert ids.shape == (0,)
+    assert ids.dtype == np.int32
+    client.embed.assert_not_called()
