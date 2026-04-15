@@ -18,11 +18,15 @@ from __future__ import annotations
 
 from typing import Protocol
 
+import logging
+
 import numpy as np
 from pydantic import BaseModel, Field
 from tqdm.auto import tqdm
 
 from src.pipeline.schema import FeeCodeRecord, NGSRecord
+
+logger = logging.getLogger(__name__)
 
 SIMILARITY_THRESHOLD = 0.5
 
@@ -125,7 +129,9 @@ def map_ngs(
                 ),
                 schema=NGSVerdict, model=llm_model, temperature=0.0,
             )
-        except Exception:  # noqa: BLE001 — treat as NOMAP, keep pipeline running
+        except Exception as exc:  # noqa: BLE001 — treat as NOMAP, keep pipeline running
+            logger.warning("NGS verdict call failed for %s/%s: %s",
+                           r.province, r.fsc_code, exc)
             out[slot] = r
             continue
 

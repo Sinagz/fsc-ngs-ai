@@ -2,6 +2,7 @@
 Only rows with confidence < threshold (default 0.8) are sent to the LLM."""
 from __future__ import annotations
 
+import logging
 from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
@@ -9,6 +10,8 @@ from pydantic import BaseModel, Field
 from tqdm.auto import tqdm
 
 from src.pipeline.schema import CandidateRow
+
+logger = logging.getLogger(__name__)
 
 
 class RescueOutput(BaseModel):
@@ -79,7 +82,9 @@ def rescue(
                 prompt=prompt, schema=RescueOutput, model=model,
                 system=SYSTEM_PROMPT, temperature=0.0,
             )
-        except Exception:  # noqa: BLE001 — any client failure means the row can't be rescued
+        except Exception as exc:  # noqa: BLE001 — any client failure means the row can't be rescued
+            logger.warning("rescue call failed for %s/%s: %s",
+                           row.province, row.fsc_code, exc)
             unresolved.append(row)
             continue
 

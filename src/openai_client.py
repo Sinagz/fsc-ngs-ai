@@ -73,6 +73,38 @@ class _Deterministic(Exception):
         self.inner = inner
 
 
+# OpenAI strict JSON-schema mode rejects pydantic's default schema output.
+# Unsupported keywords per the structured-outputs docs (as of 2026):
+#   - numeric/string constraints (minimum, maximum, minLength, pattern, ...)
+#   - 'default' on any field
+#   - 'additionalProperties' omitted (must be explicitly false)
+#   - 'required' missing fields (all properties must be required)
+# This helper rewrites a pydantic-generated schema in place to satisfy strict
+# mode while preserving semantics. Optional fields (pydantic default=None) stay
+# optional via "anyOf: [type, null]" which strict mode *does* allow.
+_STRIP_KEYS = frozenset({
+    "default", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+    "minLength", "maxLength", "pattern", "minItems", "maxItems",
+    "uniqueItems", "format",
+})
+
+
+def _strictify_schema(node: object) -> None:
+    """Recursively rewrite a JSON schema so OpenAI strict mode accepts it."""
+    if isinstance(node, dict):
+        for k in list(node.keys()):
+            if k in _STRIP_KEYS:
+                node.pop(k)
+        if node.get("type") == "object" and "properties" in node:
+            node["additionalProperties"] = False
+            node["required"] = list(node["properties"].keys())
+        for v in node.values():
+            _strictify_schema(v)
+    elif isinstance(node, list):
+        for item in node:
+            _strictify_schema(item)
+
+
 @dataclass
 class CostTracker:
     """Accumulates token counts per model across a pipeline run."""
@@ -173,9 +205,11 @@ class OpenAIClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        raw_schema = schema.model_json_schema()
+        _strictify_schema(raw_schema)
         json_schema = {
             "name": schema.__name__,
-            "schema": schema.model_json_schema(),
+            "schema": raw_schema,
             "strict": True,
         }
 
