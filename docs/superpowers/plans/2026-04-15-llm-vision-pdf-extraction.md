@@ -68,31 +68,22 @@
 **Files:**
 - None edited; git state change only
 
-- [ ] **Step 1: Create branch off main**
+- [ ] **Step 1: Create branch off the current `rebuild/pipeline-openai` tip**
 
 ```bash
-git fetch origin
-git checkout -b rebuild/pipeline-vision origin/main
+git checkout -b rebuild/pipeline-vision
 ```
 
-- [ ] **Step 2: Cherry-pick the spec commit from `rebuild/pipeline-openai`**
+This inherits the entire working pipeline (schema, openai_client, ngs_mapper, validate, embed, regression, core/loader, tests, CLI, Streamlit). Spec + plan docs come along for free.
 
-```bash
-git cherry-pick c20a298
-```
-
-Expected: commit lands cleanly (the spec file is new, no conflicts).
-
-- [ ] **Step 3: Verify**
+- [ ] **Step 2: Verify baseline is intact**
 
 ```bash
 git log --oneline -3
-ls docs/superpowers/specs/
+pytest -m unit -x
 ```
 
-Expected: `2026-04-14-llm-vision-pdf-extraction-design.md` present.
-
-- [ ] **Step 4: Commit branch state (no action — cherry-pick already created the commit)**
+Expected: plan + spec commits on top; all unit tests green against the current structural pipeline.
 
 ---
 

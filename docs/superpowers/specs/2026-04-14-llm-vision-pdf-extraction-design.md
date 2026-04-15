@@ -1,7 +1,7 @@
 # LLM-Vision PDF Extraction — Design Spec
 
 **Date:** 2026-04-14
-**Branch (proposed):** `rebuild/pipeline-vision` (branch off `main`, not off `rebuild/pipeline-openai`)
+**Branch:** `rebuild/pipeline-vision` (branch off the current `rebuild/pipeline-openai` tip — that branch carries the entire working pipeline baseline we depend on: `openai_client`, `FeeCodeRecord`, `ngs_mapper`, `validate`, `embed`, `regression`, `core/loader`, the test suite, and the CLI/Streamlit port. Branching off `main` would strand the work.)
 **Status:** Draft — pending user review
 **Authors:** Pouria Mortezaagha (with Claude)
 **Supersedes (partially):** `docs/superpowers/specs/2026-04-13-fsc-ngs-rebuild-design.md` §4 (Phase 1 pipeline), specifically the structural-then-semantic extraction path. The umbrella contracts (A–D) and Phases 2–4 are unchanged.
@@ -339,7 +339,7 @@ This is the judgment call automated gates cannot make.
 
 ## 10. Rollout checklist
 
-- [ ] Create branch `rebuild/pipeline-vision` from `main`.
+- [ ] Create branch `rebuild/pipeline-vision` from the current `rebuild/pipeline-openai` tip.
 - [ ] Land schema v2 + `chat_vision_json` addition in one commit.
 - [ ] Land `src/pipeline/vision/` modules + rewired `run.py` in one commit.
 - [ ] Land deletion of structural + semantic + tests in one commit.
