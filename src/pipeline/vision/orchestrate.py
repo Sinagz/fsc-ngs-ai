@@ -1,7 +1,7 @@
 """Province-level extraction orchestrator.
 
 Glues render + TOC + windows + extract together with bounded asyncio
-concurrency, then merges, dedups, and promotes VisionRecord ->
+concurrency, then merges, sanitizes, dedups, and promotes VisionRecord ->
 FeeCodeRecord.
 
 The pymupdf Document is shared across coroutines - pymupdf is not thread
@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import re
 from pathlib import Path
 
 import pymupdf
@@ -29,6 +30,43 @@ from src.pipeline.vision.toc import build_section_map
 from src.pipeline.vision.windows import Window, build_windows
 
 logger = logging.getLogger(__name__)
+
+# Matches pure section-numbering artefacts like "1", "2.", "10.", "12"
+_SECTION_NUMBER_RE = re.compile(r"^\d{1,2}\.?$")
+
+
+def _sanitize(records: list[VisionRecord]) -> list[VisionRecord]:
+    """Normalize ``fsc_code`` fields and expand / drop pathological entries.
+
+    Rules applied in order:
+    1. Strip leading marker characters (``#``, ``*``) and surrounding
+       whitespace from ``fsc_code``.
+    2. Strip all internal whitespace so ``"E 190"`` becomes ``"E190"``.
+    3. Split comma-separated codes into N separate records each sharing the
+       same description, price, notes, and confidence as the original.
+    4. Drop records whose ``fsc_code`` matches the section-numbering pattern
+       (``^[0-9]{1,2}[.]?$``) -- these are table/chapter headers, not fee codes.
+    5. Drop records whose ``fsc_code`` is empty after the above steps.
+    """
+    out: list[VisionRecord] = []
+    for r in records:
+        raw = r.fsc_code.lstrip("#* ").strip()
+        # Remove all internal whitespace
+        raw = re.sub(r"\s+", "", raw)
+
+        # Split on commas to handle concatenated code lists
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+
+        for code in parts:
+            # Drop section-numbering artefacts
+            if _SECTION_NUMBER_RE.match(code):
+                continue
+            # Drop anything that became empty
+            if not code:
+                continue
+            out.append(r.model_copy(update={"fsc_code": code}))
+
+    return out
 
 
 def _render_window_images(doc: pymupdf.Document, window: Window) -> list[bytes]:
@@ -142,8 +180,13 @@ async def extract_province(
         doc.close()
 
     flat = [r for batch in batches for r in batch]
-    deduped = _dedup(flat)
-    dup_count = len(flat) - len(deduped)
+    sanitized = _sanitize(flat)
+    dropped = len(flat) - len(sanitized)
+    if dropped:
+        logger.info("[%s] sanitize dropped %d records (section-numbering / empty / expanded splits)",
+                    province, dropped)
+    deduped = _dedup(sanitized)
+    dup_count = len(sanitized) - len(deduped)
     if dup_count:
         logger.info("[%s] dedup removed %d duplicate records", province, dup_count)
     return [_to_fee_code_record(r, province=province, source_pdf_hash=pdf_hash) for r in deduped]

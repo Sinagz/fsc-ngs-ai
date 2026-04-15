@@ -1,9 +1,11 @@
-"""Tests for orchestrate: dedup rule + FeeCodeRecord promotion."""
+"""Tests for orchestrate: sanitize + dedup rules + FeeCodeRecord promotion."""
 from __future__ import annotations
 
 from decimal import Decimal
 
-from src.pipeline.vision.orchestrate import _dedup, _to_fee_code_record
+import pytest
+
+from src.pipeline.vision.orchestrate import _dedup, _sanitize, _to_fee_code_record
 from src.pipeline.vision.schema import VisionRecord
 
 
@@ -43,3 +45,83 @@ def test_to_fee_code_record_promotes_fields():
     assert fcr.source_pdf_hash == "deadbeef"
     assert fcr.NGS_code is None
     assert fcr.price == Decimal("25.50")
+
+
+# ---------------------------------------------------------------------------
+# _sanitize tests
+# ---------------------------------------------------------------------------
+
+class TestSanitize:
+    """All five sanitization rules."""
+
+    def test_strip_hash_prefix(self):
+        """Leading '#' (with optional space) is stripped."""
+        result = _sanitize([_r("# E190", 0.9), _r("#E191", 0.85)])
+        codes = [r.fsc_code for r in result]
+        assert codes == ["E190", "E191"]
+
+    def test_strip_star_prefix(self):
+        """Leading '*' (with optional space) is stripped."""
+        result = _sanitize([_r("*51016", 0.9), _r("* 2017", 0.8)])
+        codes = [r.fsc_code for r in result]
+        assert codes == ["51016", "2017"]
+
+    def test_strip_internal_whitespace(self):
+        """Internal whitespace is removed so 'E 190' becomes 'E190'."""
+        result = _sanitize([_r("E 190", 0.9), _r("B 0010", 0.8)])
+        codes = [r.fsc_code for r in result]
+        assert codes == ["E190", "B0010"]
+
+    def test_split_comma_separated_codes(self):
+        """A comma-separated code string expands into multiple records."""
+        original = _r("01088, 01090, 01091", 0.7, price="12.50")
+        result = _sanitize([original])
+        assert len(result) == 3
+        codes = [r.fsc_code for r in result]
+        assert codes == ["01088", "01090", "01091"]
+        # All split records share the same description and price
+        for r in result:
+            assert r.fsc_description == original.fsc_description
+            assert r.price == original.price
+
+    def test_drop_section_numbering_single_digit(self):
+        """Pure numeric codes 1-9 (section headers) are dropped."""
+        result = _sanitize([_r("1", 0.9), _r("5", 0.8), _r("9", 0.7)])
+        assert result == []
+
+    def test_drop_section_numbering_two_digit(self):
+        """Pure numeric codes 10-99 (section headers) are dropped."""
+        result = _sanitize([_r("10.", 0.9), _r("12", 0.8), _r("99.", 0.7)])
+        assert result == []
+
+    def test_drop_section_numbering_with_period(self):
+        """Codes like '2.' match the section-numbering pattern and are dropped."""
+        result = _sanitize([_r("2.", 0.9)])
+        assert result == []
+
+    def test_drop_empty_after_strip(self):
+        """Records that become empty after stripping are dropped."""
+        result = _sanitize([_r("# ", 0.9), _r("*", 0.8), _r("  ", 0.7)])
+        assert result == []
+
+    def test_valid_codes_pass_through_unchanged(self):
+        """Well-formed codes are returned without modification."""
+        codes_in = ["A001", "01234", "E190", "B0010"]
+        result = _sanitize([_r(c, 0.9) for c in codes_in])
+        assert [r.fsc_code for r in result] == codes_in
+
+    def test_sanitize_then_dedup_collapses_duplicates(self):
+        """'# E190' and 'E190' normalise to the same code; dedup keeps one."""
+        records = [_r("# E190", 0.7), _r("E190", 0.95)]
+        sanitized = _sanitize(records)
+        deduped = _dedup(sanitized)
+        assert len(deduped) == 1
+        assert deduped[0].fsc_code == "E190"
+        assert deduped[0].extraction_confidence == 0.95
+
+    @pytest.mark.parametrize("code", ["A001", "G003", "00001", "E003A"])
+    def test_three_digit_plus_codes_not_dropped(self, code: str):
+        """Codes with 3+ digits are never treated as section numbers."""
+        result = _sanitize([_r(code, 0.9)])
+        assert len(result) == 1
+        assert result[0].fsc_code == code
