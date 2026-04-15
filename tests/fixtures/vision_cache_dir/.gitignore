@@ -1,0 +1,2 @@
+# Track hishel_cache.db as a test fixture (required for CI offline replay)
+!hishel_cache.db
