@@ -268,6 +268,113 @@ class OpenAIClient:
 
         return self._with_retry(_call, max_retries=max_retries)
 
+    def chat_vision_json(
+        self,
+        *,
+        prompt: str,
+        images: list[bytes],
+        schema: type[T],
+        model: str,
+        system: str | None = None,
+        temperature: float = 0.0,
+        max_retries: int = 3,
+    ) -> T:
+        """Vision-enabled chat_json.
+
+        ``images`` is a list of raw image bytes (PNG); each is base64-encoded
+        into a ``data:`` URL with ``detail=high``. The request body, including
+        image bytes, forms the hishel cache key, so identical inputs replay
+        from the SQLite cache.
+
+        Deterministic failures (``json.JSONDecodeError``,
+        :class:`pydantic.ValidationError`, null content / usage) are raised
+        immediately — retrying at ``temperature=0`` would just burn tokens
+        for the same result. Transport/API errors are retried with
+        exponential backoff.
+        """
+        import base64
+
+        messages: list[dict] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for img in images:
+            b64 = base64.b64encode(img).decode("ascii")
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{b64}",
+                        "detail": "high",
+                    },
+                }
+            )
+        messages.append({"role": "user", "content": content})
+
+        raw_schema = schema.model_json_schema()
+        _strictify_schema(raw_schema)
+        json_schema = {
+            "name": schema.__name__,
+            "schema": raw_schema,
+            "strict": True,
+        }
+
+        def _call() -> T:
+            resp = self._sdk.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": json_schema,
+                },
+            )
+
+            finish = (
+                resp.choices[0].finish_reason
+                if resp.choices
+                else "unknown"
+            )
+
+            if resp.usage is None:
+                raise _Deterministic(
+                    ValueError(
+                        f"OpenAI returned no usage block "
+                        f"(finish_reason={finish})"
+                    )
+                )
+
+            content_raw = (
+                resp.choices[0].message.content if resp.choices else None
+            )
+            if content_raw is None:
+                raise _Deterministic(
+                    ValueError(
+                        f"OpenAI returned null content "
+                        f"(finish_reason={finish})"
+                    )
+                )
+
+            try:
+                payload = json.loads(content_raw)
+            except json.JSONDecodeError as exc:
+                raise _Deterministic(exc) from exc
+
+            try:
+                parsed = schema.model_validate(payload)
+            except ValidationError as exc:
+                raise _Deterministic(exc) from exc
+
+            self.costs.record(
+                model=resp.model,
+                prompt_tokens=resp.usage.prompt_tokens,
+                completion_tokens=resp.usage.completion_tokens,
+            )
+            return parsed
+
+        return self._with_retry(_call, max_retries=max_retries)
+
     def embed(
         self,
         texts: list[str],
