@@ -17,7 +17,6 @@ from src.pipeline.ngs_mapper import map_ngs
 from src.pipeline.ngs_parser import parse_ngs_docx
 from src.pipeline.regression import check, diff, format_report
 from src.pipeline.schema import FeeCodeRecord, Manifest
-from src.pipeline.validate import validate
 from src.pipeline.vision import extract_province as vision_extract_province
 
 logger = logging.getLogger(__name__)
@@ -220,12 +219,6 @@ def run_pipeline(
     return PipelineResult(skipped=False, version_dir=version_dir, manifest=manifest)
 
 
-def _write_jsonl(path: Path, items: list[dict], *, append: bool = False) -> None:
-    mode = "a" if append else "w"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, mode, encoding="utf-8") as f:
-        for item in items:
-            f.write(json.dumps(item) + "\n")
 
 
 def _latest_previous(output_dir: Path, current_version: str) -> Path | None:

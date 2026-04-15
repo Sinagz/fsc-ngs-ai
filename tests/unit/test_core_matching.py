@@ -8,7 +8,7 @@ def _rec(province: str, code: str, desc: str, ngs_code: str | None = "1AA") -> F
     return FeeCodeRecord(
         province=province, fsc_code=code, fsc_fn=code, fsc_description=desc,
         page=1, source_pdf_hash="a" * 64,
-        extraction_method="structural", extraction_confidence=1.0,
+        extraction_method="vision", extraction_confidence=1.0,
         NGS_code=ngs_code, NGS_label="Exam" if ngs_code else None,
     )
 

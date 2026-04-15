@@ -7,48 +7,15 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Province = Literal["ON", "BC", "YT"]
-ExtractionMethod = Literal["structural", "semantic", "vision"]
+ExtractionMethod = Literal["vision"]
 NGSMethod = Literal["exact", "llm", "manual"]
-
-
-class PageBlock(BaseModel):
-    """One pymupdf text block with layout metadata."""
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    page: int
-    text: str
-    x0: float
-    y0: float
-    x1: float
-    y1: float
-    font: str
-    size: float
-
-
-class CandidateRow(BaseModel):
-    """Structural-parser output before validation + NGS mapping."""
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    province: Province
-    fsc_code: str
-    fsc_fn: str
-    fsc_description: str
-    fsc_chapter: str | None = None
-    fsc_section: str | None = None
-    fsc_subsection: str | None = None
-    fsc_notes: str | None = None
-    price: Decimal | None = None
-    page: int
-    source_pdf_hash: str
-    confidence: float = Field(ge=0.0, le=1.0)
-    origin: ExtractionMethod = "structural"
 
 
 class FeeCodeRecord(BaseModel):
     """Validated, NGS-mapped fee code record. The canonical type."""
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: Literal["1", "2"] = "2"
+    schema_version: Literal["2"] = "2"
     province: Province
     fsc_code: str
     fsc_fn: str

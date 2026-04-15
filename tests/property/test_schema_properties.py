@@ -45,7 +45,7 @@ def test_record_json_roundtrip(province, code, page, confidence, price):
         fsc_description="d",
         page=page,
         source_pdf_hash="a" * 64,
-        extraction_method="structural",
+        extraction_method="vision",
         extraction_confidence=confidence,
         price=price,
     )
@@ -64,7 +64,7 @@ def test_record_is_immutable(province, code, conf):
     r = FeeCodeRecord(
         province=province, fsc_code=code, fsc_fn="fn", fsc_description="d",
         page=1, source_pdf_hash="a" * 64,
-        extraction_method="structural", extraction_confidence=conf,
+        extraction_method="vision", extraction_confidence=conf,
     )
     with pytest.raises(ValidationError):
         r.fsc_code = "X"  # type: ignore[misc]

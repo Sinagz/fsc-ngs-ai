@@ -3,7 +3,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.pipeline.schema import (
-    FeeCodeRecord, NGSRecord, Manifest, CandidateRow, PageBlock,
+    FeeCodeRecord, NGSRecord, Manifest,
 )
 
 
@@ -12,7 +12,7 @@ def _valid_record_kwargs() -> dict:
         province="ON", fsc_code="K040", fsc_fn="Periodic health visit",
         fsc_description="General periodic visit, adult.", page=47,
         source_pdf_hash="a" * 64,
-        extraction_method="structural", extraction_confidence=1.0,
+        extraction_method="vision", extraction_confidence=1.0,
     )
 
 
@@ -45,14 +45,6 @@ def test_record_rejects_negative_confidence():
         FeeCodeRecord(**kwargs)
 
 
-def test_candidate_row_is_frozen():
-    row = CandidateRow(
-        province="ON", fsc_code="K040", fsc_fn="", fsc_description="",
-        page=1, confidence=0.9, source_pdf_hash="a" * 64,
-    )
-    with pytest.raises(ValidationError):
-        row.confidence = 0.1  # type: ignore[misc]
-
 
 def test_manifest_records_schema_version():
     m = Manifest(
@@ -81,3 +73,35 @@ def test_extraction_method_accepts_vision():
         extraction_confidence=0.95,
     )
     assert record.extraction_method == "vision"
+
+
+def test_schema_version_rejects_v1():
+    import pytest
+    from pydantic import ValidationError
+    from src.pipeline.schema import FeeCodeRecord
+    with pytest.raises(ValidationError):
+        FeeCodeRecord(
+            schema_version="1",
+            province="ON", fsc_code="A", fsc_fn="x", fsc_description="y",
+            page=1, source_pdf_hash="h",
+            extraction_method="vision", extraction_confidence=0.9,
+        )
+
+
+def test_extraction_method_rejects_structural():
+    import pytest
+    from pydantic import ValidationError
+    from src.pipeline.schema import FeeCodeRecord
+    with pytest.raises(ValidationError):
+        FeeCodeRecord(
+            schema_version="2",
+            province="ON", fsc_code="A", fsc_fn="x", fsc_description="y",
+            page=1, source_pdf_hash="h",
+            extraction_method="structural", extraction_confidence=0.9,
+        )
+
+
+def test_candidate_row_and_pageblock_are_gone():
+    import src.pipeline.schema as s
+    assert not hasattr(s, "CandidateRow")
+    assert not hasattr(s, "PageBlock")

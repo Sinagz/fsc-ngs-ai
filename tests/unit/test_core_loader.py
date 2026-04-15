@@ -12,7 +12,7 @@ def _rec(province: str, code: str) -> FeeCodeRecord:
     return FeeCodeRecord(
         province=province, fsc_code=code, fsc_fn="fn", fsc_description="d",
         page=1, source_pdf_hash="a" * 64,
-        extraction_method="structural", extraction_confidence=1.0,
+        extraction_method="vision", extraction_confidence=1.0,
     )
 
 
