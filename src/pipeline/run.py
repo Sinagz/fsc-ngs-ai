@@ -1,6 +1,8 @@
 """Pipeline orchestrator. Idempotent (skip-if-output-exists), --force to redo."""
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import logging
 import subprocess
@@ -11,28 +13,18 @@ from pathlib import Path
 
 from src.openai_client import OpenAIClient
 from src.pipeline.embed import build_embeddings, save_npz
-from src.pipeline.io import load_pdf, pdf_hash
 from src.pipeline.ngs_mapper import map_ngs
 from src.pipeline.ngs_parser import parse_ngs_docx
 from src.pipeline.regression import check, diff, format_report
 from src.pipeline.schema import FeeCodeRecord, Manifest
-from src.pipeline.semantic import rescue
-from src.pipeline.structural.bc import BCExtractor
-from src.pipeline.structural.ontario import OntarioExtractor
-from src.pipeline.structural.yukon import YukonExtractor
 from src.pipeline.validate import validate
+from src.pipeline.vision import extract_province as vision_extract_province
 
 logger = logging.getLogger(__name__)
 
 
 def _tokens(snapshot: dict[str, dict[str, int]]) -> int:
     return sum(s["prompt_tokens"] + s["completion_tokens"] for s in snapshot.values())
-
-PROVINCE_EXTRACTORS = {
-    "ON": OntarioExtractor(),
-    "BC": BCExtractor(),
-    "YT": YukonExtractor(),
-}
 
 
 @dataclass(frozen=True)
@@ -76,6 +68,14 @@ def _province_pdf(pdf_dir: Path, province: str) -> Path | None:
     return hits[-1] if hits else None
 
 
+def _pdf_hash(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def run_pipeline(
     cfg: PipelineConfig, *, client: OpenAIClient | None
 ) -> PipelineResult:
@@ -96,64 +96,44 @@ def run_pipeline(
 
     # Clear diagnostics from any prior run so a --force re-run doesn't silently
     # concatenate this run's output with stale rows.
-    for name in ("unresolved.jsonl", "validation_rejects.jsonl"):
-        (cfg.diagnostics_dir / name).unlink(missing_ok=True)
+    # (window_failures.jsonl is unlinked in Phase 1 directly.)
 
     t0 = time.monotonic()
     logger.info("Pipeline started (version=%s, force=%s)", cfg.version, cfg.force)
 
-    # Phase 1: Extract + rescue per province
-    logger.info("Phase 1/5: Structural extraction + LLM rescue (per province)")
+    # Phase 1: Vision extraction per province
+    logger.info("Phase 1/5: Vision extraction (per province)")
     phase_t0 = time.monotonic()
-    all_candidates = []
+    records: list[FeeCodeRecord] = []
     pdf_hashes: dict[str, str] = {}
-    context_lines: dict[tuple[int, str], str] = {}
-    for province, extractor in PROVINCE_EXTRACTORS.items():
+    failure_log = cfg.diagnostics_dir / "window_failures.jsonl"
+    failure_log.unlink(missing_ok=True)
+
+    for province in ("ON", "BC", "YT"):
         pdf = _province_pdf(cfg.raw_pdf_dir, province)
         if pdf is None:
             logger.warning("  [%s] no PDF found; skipping", province)
             continue
-        logger.info("  [%s] loading %s", province, pdf.name)
-        h = pdf_hash(pdf)
-        pdf_hashes[province] = h
-        pages = load_pdf(pdf)
-        rows = list(extractor.extract(pages, source_pdf_hash=h))
-        low_conf = sum(1 for r in rows if r.confidence < 0.8)
-        logger.info("  [%s] %d candidate rows (%d need LLM rescue)",
-                    province, len(rows), low_conf)
-        rescued, unresolved = rescue(
-            rows,
-            client=client,
-            model=cfg.extract_model,
-            context_lines=context_lines,
-            threshold=0.8,
-            desc=f"Rescue {province}",
+        logger.info("  [%s] extracting from %s", province, pdf.name)
+        pdf_hashes[province] = _pdf_hash(pdf)
+        province_records = asyncio.run(
+            vision_extract_province(
+                pdf,
+                province=province,
+                client=client,
+                model=cfg.extract_model,
+                failure_log=failure_log,
+            )
         )
-        _write_jsonl(
-            cfg.diagnostics_dir / "unresolved.jsonl",
-            [r.model_dump(mode="json") for r in unresolved],
-            append=True,
-        )
-        logger.info("  [%s] rescued=%d unresolved=%d", province,
-                    len(rescued), len(unresolved))
-        all_candidates.extend(rescued)
-    logger.info("Phase 1 done in %.1fs (%d total candidates, tokens so far: %d)",
-                time.monotonic() - phase_t0, len(all_candidates),
+        logger.info("  [%s] %d records extracted", province, len(province_records))
+        records.extend(province_records)
+
+    logger.info("Phase 1 done in %.1fs (%d total records, tokens so far: %d)",
+                time.monotonic() - phase_t0, len(records),
                 _tokens(client.costs.snapshot()))
 
-    # Phase 2: Validate
-    logger.info("Phase 2/5: Validation")
-    phase_t0 = time.monotonic()
-    records, rejects = validate(all_candidates)
-    _write_jsonl(
-        cfg.diagnostics_dir / "validation_rejects.jsonl",
-        [
-            {"row": e.candidate.model_dump(mode="json"), "reason": e.reason}
-            for e in rejects
-        ],
-    )
-    logger.info("Phase 2 done in %.1fs (accepted=%d rejected=%d)",
-                time.monotonic() - phase_t0, len(records), len(rejects))
+    # Phase 2: (No-op) vision path is pre-validated by pydantic
+    logger.info("Phase 2/5: Validation (vision records are pre-validated by pydantic)")
 
     # Phase 3: NGS mapping
     logger.info("Phase 3/5: NGS mapping (exact -> semantic+LLM verdict)")

@@ -40,3 +40,51 @@ def test_pipeline_skips_completed_steps(tmp_path: Path, monkeypatch):
     assert not cfg.diagnostics_dir.exists(), (
         "skip path must not create diagnostics dir"
     )
+
+
+from unittest.mock import patch
+from pathlib import Path
+
+import pytest
+
+
+def test_run_pipeline_uses_vision_extract(monkeypatch, tmp_path):
+    """After rewire, run_pipeline should call src.pipeline.vision.extract_province
+    per province (not the structural extractors).
+    """
+    from src.pipeline import run as run_mod
+
+    called = []
+
+    async def fake_extract_province(pdf_path, *, province, client, **kwargs):
+        called.append((province, Path(pdf_path).name))
+        return []
+
+    monkeypatch.setattr(run_mod, "vision_extract_province", fake_extract_province, raising=False)
+
+    # Minimal fixture dirs
+    (tmp_path / "pdf").mkdir()
+    (tmp_path / "docx").mkdir()
+    # Fake PDFs matching the glob patterns so _province_pdf resolves.
+    for name in (
+        "moh-schedule-benefit-fake.pdf",
+        "msc_payment_schedule_-_fake.pdf",
+        "yukon_physician_fee_guide_fake.pdf",
+    ):
+        (tmp_path / "pdf" / name).write_bytes(b"%PDF-fake")
+
+    cfg = run_mod.PipelineConfig(
+        raw_pdf_dir=tmp_path / "pdf",
+        raw_docx_dir=tmp_path / "docx",
+        output_dir=tmp_path / "out",
+        diagnostics_dir=tmp_path / "diag",
+        version="test",
+        force=True,
+    )
+
+    with pytest.raises(Exception):
+        # Will fail somewhere in NGS/embed with empty records; we only care
+        # that vision_extract_province was invoked for each province.
+        run_mod.run_pipeline(cfg, client=object())
+
+    assert {c[0] for c in called} == {"ON", "BC", "YT"}
