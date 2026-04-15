@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock
 
-import pytest
 from pydantic import ValidationError
 
 from src.pipeline.vision.extract import extract_window
@@ -115,3 +114,35 @@ def test_extract_window_passes_images_in_context_then_target_order():
 
     first_call_images = client.chat_vision_json.call_args.kwargs["images"]
     assert first_call_images == [b"context-img", b"target-img"]
+
+
+def test_extract_window_writes_failure_log_on_double_fail(tmp_path):
+    import json as _json
+    try:
+        WindowExtraction(records=[{"bogus": 1}])
+    except ValidationError as exc:
+        validation_err = exc
+
+    client = _make_client([validation_err, validation_err])
+    window = _make_window(target_page=42)
+    log_path = tmp_path / "diag" / "window_failures.jsonl"
+
+    records = asyncio.run(
+        extract_window(
+            window=window,
+            province="BC",
+            images=[b"img"],
+            client=client,
+            failure_log=log_path,
+        )
+    )
+
+    assert records == []
+    assert log_path.exists()
+    lines = log_path.read_text(encoding="utf-8").strip().split("\n")
+    assert len(lines) == 1
+    entry = _json.loads(lines[0])
+    assert entry["province"] == "BC"
+    assert entry["target_page"] == 42
+    assert entry["error_class"] == "ValidationError"
+    assert "message" in entry
