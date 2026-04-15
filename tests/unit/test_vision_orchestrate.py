@@ -125,3 +125,63 @@ class TestSanitize:
         result = _sanitize([_r(code, 0.9)])
         assert len(result) == 1
         assert result[0].fsc_code == code
+
+    # -----------------------------------------------------------------------
+    # New garbage-rejection rules (4 patterns)
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize("code", ["A", "a", "b", "Z"])
+    def test_drop_single_letter_codes(self, code: str):
+        """Single alphabetic characters are dropped (section headers, not fee codes)."""
+        result = _sanitize([_r(code, 0.9)])
+        assert result == [], f"Expected {code!r} to be dropped"
+
+    @pytest.mark.parametrize("code", ["C.10.", "A.1.", "D.9.2.4", "B.3.1.", "Z.12"])
+    def test_drop_dotted_section_numbers(self, code: str):
+        """Letter + dot + numeric section patterns are dropped."""
+        result = _sanitize([_r(code, 0.9)])
+        assert result == [], f"Expected {code!r} to be dropped"
+
+    @pytest.mark.parametrize("code", ["32.1", "32.2", "5.10", "100.25"])
+    def test_drop_dotted_decimal_numbers(self, code: str):
+        """Dotted decimal numbers like 32.1 are dropped (not fee codes)."""
+        result = _sanitize([_r(code, 0.9)])
+        assert result == [], f"Expected {code!r} to be dropped"
+
+    @pytest.mark.parametrize("code", ["MOH", "MRI", "CPSO", "OHIP", "AMA", "BCMA"])
+    def test_drop_all_caps_acronyms(self, code: str):
+        """3-4 letter all-caps acronyms (no digits) are dropped."""
+        result = _sanitize([_r(code, 0.9)])
+        assert result == [], f"Expected {code!r} to be dropped"
+
+    # -----------------------------------------------------------------------
+    # Keep cases: verify legit codes are NOT dropped by the new rules
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize("code", ["GP", "IC"])
+    def test_keep_two_letter_caps_codes(self, code: str):
+        """2-letter all-caps codes are kept (ambiguous; downstream handles them)."""
+        result = _sanitize([_r(code, 0.9)])
+        assert len(result) == 1
+        assert result[0].fsc_code == code
+
+    @pytest.mark.parametrize("code", ["A001A", "E190A"])
+    def test_keep_codes_with_trailing_letter(self, code: str):
+        """Codes with a trailing letter suffix (ON variant) are kept."""
+        result = _sanitize([_r(code, 0.9)])
+        assert len(result) == 1
+        assert result[0].fsc_code == code
+
+    @pytest.mark.parametrize("code", ["B00010", "CV07404"])
+    def test_keep_bc_style_codes(self, code: str):
+        """BC-style codes (leading letter + 5-digit numeric) are kept."""
+        result = _sanitize([_r(code, 0.9)])
+        assert len(result) == 1
+        assert result[0].fsc_code == code
+
+    @pytest.mark.parametrize("code", ["123456", "001234", "99999"])
+    def test_keep_numeric_codes_up_to_6_digits(self, code: str):
+        """Numeric codes up to 6 digits (legit YT) are kept."""
+        result = _sanitize([_r(code, 0.9)])
+        assert len(result) == 1
+        assert result[0].fsc_code == code

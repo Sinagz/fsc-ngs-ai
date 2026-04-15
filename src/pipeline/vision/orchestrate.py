@@ -34,6 +34,35 @@ logger = logging.getLogger(__name__)
 # Matches pure section-numbering artefacts like "1", "2.", "10.", "12"
 _SECTION_NUMBER_RE = re.compile(r"^\d{1,2}\.?$")
 
+# Additional garbage-pattern regexes
+_SINGLE_LETTER_RE = re.compile(r"^[A-Za-z]$")
+_DOTTED_SECTION_RE = re.compile(r"^[A-Z]\.\d+(\.\d+)*\.?$")
+_DOTTED_DECIMAL_RE = re.compile(r"^\d{1,3}\.\d+$")
+_CAPS_ACRONYM_RE = re.compile(r"^[A-Z]{3,4}$")
+
+
+def _is_junk(code: str) -> bool:
+    """Return True when *code* matches any known garbage pattern.
+
+    Patterns (applied after strip / internal-whitespace removal):
+    - Single alphabetic character  (e.g. "A", "a") -- section markers
+    - Letter + dotted numeric section (e.g. "C.10.", "D.9.2.4") -- chapter refs
+    - Dotted decimal number (e.g. "32.1") -- section decimals, not fee codes
+    - 3-4 letter all-caps acronym with no digits (e.g. "MOH", "OHIP") -- text fragments
+
+    NOT junk (kept intentionally):
+    - 2-letter all-caps like "GP", "IC" -- ambiguous; downstream decides
+    - Codes with trailing letter suffix like "A001A" -- legitimate ON variants
+    - Letter + 5+-digit numeric like "B00010", "CV07404" -- legitimate BC codes
+    - Pure numeric up to 6 digits -- legitimate YT codes
+    """
+    return (
+        bool(_SINGLE_LETTER_RE.match(code))
+        or bool(_DOTTED_SECTION_RE.match(code))
+        or bool(_DOTTED_DECIMAL_RE.match(code))
+        or bool(_CAPS_ACRONYM_RE.match(code))
+    )
+
 
 def _sanitize(records: list[VisionRecord]) -> list[VisionRecord]:
     """Normalize ``fsc_code`` fields and expand / drop pathological entries.
@@ -46,7 +75,10 @@ def _sanitize(records: list[VisionRecord]) -> list[VisionRecord]:
        same description, price, notes, and confidence as the original.
     4. Drop records whose ``fsc_code`` matches the section-numbering pattern
        (``^[0-9]{1,2}[.]?$``) -- these are table/chapter headers, not fee codes.
-    5. Drop records whose ``fsc_code`` is empty after the above steps.
+    5. Drop records matching any ``_is_junk`` garbage pattern:
+       single letters, dotted section numbers, dotted decimals, all-caps
+       acronyms (3-4 chars, no digits).
+    6. Drop records whose ``fsc_code`` is empty after the above steps.
     """
     out: list[VisionRecord] = []
     for r in records:
@@ -60,6 +92,9 @@ def _sanitize(records: list[VisionRecord]) -> list[VisionRecord]:
         for code in parts:
             # Drop section-numbering artefacts
             if _SECTION_NUMBER_RE.match(code):
+                continue
+            # Drop known garbage patterns
+            if _is_junk(code):
                 continue
             # Drop anything that became empty
             if not code:
