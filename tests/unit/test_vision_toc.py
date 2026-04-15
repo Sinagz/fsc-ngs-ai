@@ -19,11 +19,14 @@ def test_empty_map_when_no_toc(tmp_path):
 def test_forward_fill_from_toc():
     m = build_section_map(FIXTURE)
     # Fixture has: L1 Introduction@1, L1 Procedures@2, L2 Minor@2, L2 Major@3
-    assert m[1] == SectionContext(chapter="Introduction", section=None, subsection=None)
-    assert m[2] == SectionContext(chapter="Procedures", section="Minor", subsection=None)
-    assert m[3] == SectionContext(chapter="Procedures", section="Major", subsection=None)
+    exp1 = SectionContext(chapter="Introduction", section=None, subsection=None)
+    exp2 = SectionContext(chapter="Procedures", section="Minor", subsection=None)
+    exp3 = SectionContext(chapter="Procedures", section="Major", subsection=None)
+    assert m[1] == exp1
+    assert m[2] == exp2
+    assert m[3] == exp3
     # Page 4 has no new entry, so it inherits page 3
-    assert m[4] == SectionContext(chapter="Procedures", section="Major", subsection=None)
+    assert m[4] == exp3
 
 
 def test_higher_level_clears_deeper_levels():
