@@ -146,3 +146,52 @@ def test_extract_window_writes_failure_log_on_double_fail(tmp_path):
     assert entry["target_page"] == 42
     assert entry["error_class"] == "ValidationError"
     assert "message" in entry
+
+
+def test_orchestrate_one_swallows_api_failure(tmp_path):
+    """Any exception inside extract_window must not kill the gather."""
+    import asyncio
+    from unittest.mock import MagicMock
+
+    import pymupdf
+    from src.pipeline.vision.orchestrate import extract_province
+    from src.pipeline.vision.schema import WindowExtraction, VisionRecord
+
+    pdf = tmp_path / "test.pdf"
+    doc = pymupdf.open()
+    for _ in range(3):
+        doc.new_page(width=612, height=792)
+    doc.save(pdf)
+    doc.close()
+
+    # Client that succeeds on calls 1 and 3, raises RuntimeError on call 2.
+    client = MagicMock()
+    call_count = {"n": 0}
+
+    def _side(*args, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 2:
+            raise RuntimeError("simulated API failure")
+        return WindowExtraction(records=[
+            VisionRecord(
+                province="ON", fsc_code=f"P{call_count['n']:03d}", fsc_fn="fn",
+                fsc_description="desc", page=call_count["n"], extraction_confidence=0.9,
+            )
+        ])
+
+    client.chat_vision_json.side_effect = _side
+
+    failure_log = tmp_path / "diag" / "window_failures.jsonl"
+    records = asyncio.run(
+        extract_province(pdf, province="ON", client=client, concurrency=1, failure_log=failure_log)
+    )
+
+    # Windows 1 and 3 should have produced records; window 2 failed and was logged.
+    assert len(records) == 2
+    assert failure_log.exists()
+    lines = failure_log.read_text(encoding="utf-8").strip().split("\n")
+    assert len(lines) == 1
+    import json as _json
+    entry = _json.loads(lines[0])
+    assert entry["error_class"] == "RuntimeError"
+    assert "simulated API failure" in entry["message"]

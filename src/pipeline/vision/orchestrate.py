@@ -105,15 +105,32 @@ async def extract_province(
 
         async def _one(w: Window) -> list[VisionRecord]:
             async with sem:
-                imgs = _render_window_images(doc, w)
-                return await extract_window(
-                    window=w,
-                    province=province,
-                    images=imgs,
-                    client=client,
-                    model=model,
-                    failure_log=failure_log,
-                )
+                try:
+                    imgs = _render_window_images(doc, w)
+                    return await extract_window(
+                        window=w,
+                        province=province,
+                        images=imgs,
+                        client=client,
+                        model=model,
+                        failure_log=failure_log,
+                    )
+                except Exception as e:  # noqa: BLE001 — any failure becomes a zero-record window
+                    logger.warning(
+                        "[%s] window %d raised %s: %s (skipping, contributing 0 records)",
+                        province, w.target_page, type(e).__name__, e,
+                    )
+                    if failure_log is not None:
+                        import json as _json
+                        failure_log.parent.mkdir(parents=True, exist_ok=True)
+                        with failure_log.open("a", encoding="utf-8") as f:
+                            f.write(_json.dumps({
+                                "province": province,
+                                "target_page": w.target_page,
+                                "error_class": type(e).__name__,
+                                "message": str(e)[:500],
+                            }) + "\n")
+                    return []
 
         logger.info("[%s] dispatching %d windows (concurrency=%d)",
                     province, len(windows), concurrency)

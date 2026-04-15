@@ -30,7 +30,11 @@ FIELD RULES:
   fsc_fn                : short function/name string (the brief label next to the code).
   fsc_description       : full description as one string; join wrapped lines with a space.
   fsc_notes             : rich notes paragraphs attached to this code, or null if none.
-  price                 : dollar amount for this code (strip the $). null if no price shown.
+  price                 : DECIMAL DOLLAR AMOUNT ONLY (e.g. 83.68). Strip the $ sign.
+                          If the price is null/absent → emit null.
+                          If the price is a PERCENTAGE (e.g. "20%"), relative expression
+                          (e.g. "50% of E234"), or any non-decimal value → emit null for
+                          price AND include the full price expression verbatim in fsc_notes.
   page                  : {target_page} (always the TARGET PAGE number, 1-indexed).
   extraction_confidence : your calibrated 0.0-1.0 confidence for this record.
 """
