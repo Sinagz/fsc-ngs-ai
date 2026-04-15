@@ -61,3 +61,33 @@ def test_load_latest_raises_when_no_versions(tmp_path: Path):
     (tmp_path / "not-a-version").mkdir()
     with pytest.raises(FileNotFoundError):
         load_latest(tmp_path)
+
+
+def test_loader_rejects_v1_artifacts(tmp_path):
+    vdir = tmp_path / "v2025-01-01"
+    vdir.mkdir()
+    (vdir / "codes.json").write_text(json.dumps([
+        {
+            "schema_version": "1",
+            "province": "ON",
+            "fsc_code": "A001",
+            "fsc_fn": "x",
+            "fsc_description": "y",
+            "page": 1,
+            "source_pdf_hash": "h",
+            "extraction_method": "structural",
+            "extraction_confidence": 0.9,
+        }
+    ]))
+    (vdir / "manifest.json").write_text(json.dumps({
+        "schema_version": "1", "generated_at": "2025-01-01T00:00:00+00:00",
+        "git_sha": "abc", "row_counts": {"ON": 1, "BC": 0, "YT": 0},
+        "source_pdf_hashes": {"ON": "h"}, "models": {"embed": "x", "extract": "y"},
+        "regression_override": None,
+    }))
+    np.savez(vdir / "embeddings.npz",
+             embeddings=np.zeros((1, 1024), dtype=np.float32),
+             record_ids=np.array([0], dtype=np.int32))
+
+    with pytest.raises(RuntimeError, match="schema v1.*rerun the pipeline"):
+        load_latest(tmp_path)

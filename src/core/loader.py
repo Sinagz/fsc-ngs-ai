@@ -22,8 +22,17 @@ def load_latest(
         raise FileNotFoundError(f"No versioned artifacts in {parsed_dir}")
     vdir = version_dirs[-1]
 
-    codes = json.loads((vdir / "codes.json").read_text(encoding="utf-8"))
-    records = [FeeCodeRecord(**c) for c in codes]
+    codes_raw = json.loads((vdir / "codes.json").read_text(encoding="utf-8"))
+
+    # Schema-version guard: refuse v1 up front with an actionable message.
+    # pydantic would also reject, but the error message would be cryptic.
+    if codes_raw and codes_raw[0].get("schema_version") != "2":
+        raise RuntimeError(
+            f"Artifact at {vdir} uses schema v{codes_raw[0].get('schema_version')}; "
+            "this app expects v2. rerun the pipeline: python -m src.cli run --force"
+        )
+
+    records = [FeeCodeRecord(**c) for c in codes_raw]
 
     embeddings = np.zeros((0, 0), dtype=np.float32)
     record_ids = np.zeros((0,), dtype=np.int32)

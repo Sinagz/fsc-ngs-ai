@@ -176,12 +176,20 @@ def run_pipeline(
     previous = _latest_previous(cfg.output_dir, cfg.version)
     if previous is not None:
         logger.info("  comparing against %s", previous.parent.name)
-        old_records = [FeeCodeRecord(**d) for d in json.loads(previous.read_text())]
-        report = diff(new=records, old=old_records)
-        ok, reasons = check(report, golden_set=set(cfg.golden_set))
-        (cfg.diagnostics_dir / "regression_diff.txt").write_text(format_report(report))
-        if not ok and cfg.accept_regression is None:
-            raise RuntimeError("Regression gate failed:\n" + "\n".join(reasons))
+        old_raw = json.loads(previous.read_text())
+        prior_version = old_raw[0].get("schema_version") if old_raw else "2"
+        if prior_version != "2":
+            logger.warning(
+                "  prior artifact uses schema v%s (incompatible with v2); skipping regression diff",
+                prior_version,
+            )
+        else:
+            old_records = [FeeCodeRecord(**d) for d in old_raw]
+            report = diff(new=records, old=old_records)
+            ok, reasons = check(report, golden_set=set(cfg.golden_set))
+            (cfg.diagnostics_dir / "regression_diff.txt").write_text(format_report(report))
+            if not ok and cfg.accept_regression is None:
+                raise RuntimeError("Regression gate failed:\n" + "\n".join(reasons))
     else:
         logger.info("  no prior version found; skipping regression diff")
     logger.info("Phase 5 done in %.1fs", time.monotonic() - phase_t0)
