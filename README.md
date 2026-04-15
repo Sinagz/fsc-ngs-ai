@@ -145,6 +145,40 @@ Open `http://localhost:8501`.
 
 ---
 
+## Getting started from a fresh clone
+
+When cloning the repo, the committed pipeline artifacts (`data/parsed/v*/codes.json` and `manifest.json`) are present, but `embeddings.npz` is gitignored (49 MB). The app works without embeddings (falls back to Jaccard similarity), but semantic search is faster and more accurate.
+
+To rebuild embeddings without re-running the full pipeline (which requires the raw PDFs):
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure OpenAI
+cp .env.example .env
+# edit .env and set OPENAI_API_KEY=sk-...
+
+# 3. Re-build embeddings from the newest committed codes.json
+python -m src.cli embed
+```
+
+This takes **~45 seconds** and costs **~$0.08** in OpenAI fees, and gives full semantic-search quality without needing the raw PDFs or running the ~10-minute full pipeline.
+
+To rebuild embeddings from a specific version:
+```bash
+python -m src.cli embed --version 2026-04-15-vision-clean
+```
+
+To force a re-build even if embeddings already exist:
+```bash
+python -m src.cli embed --force
+```
+
+For the full rebuild (which requires raw PDFs), see step 3 under "Quick start" above.
+
+---
+
 ## Runtime architecture
 
 The Streamlit app imports from `src/core/` and reads the newest `data/parsed/v<DATE>/` bundle once (cached for the process via `@st.cache_resource`). Nothing at runtime touches PDFs, DOCXs, or OpenAI.
