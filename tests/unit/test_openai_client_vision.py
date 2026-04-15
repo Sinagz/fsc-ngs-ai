@@ -82,3 +82,20 @@ def test_chat_vision_json_validation_error_does_not_retry(monkeypatch):
                 model="gpt-5.4-mini",
             )
         assert mock_create.call_count == 1  # deterministic error, no retry
+
+
+def test_chat_vision_json_rejects_empty_images(monkeypatch):
+    """chat_vision_json must reject empty images list with clear error.
+
+    An empty images list would silently produce a text-only request to the
+    vision model, which is almost certainly a caller bug. Fail loudly.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    client = OpenAIClient()
+    with pytest.raises(ValueError, match="at least one image"):
+        client.chat_vision_json(
+            prompt="x",
+            images=[],
+            schema=_Tiny,
+            model="gpt-5.4-mini",
+        )

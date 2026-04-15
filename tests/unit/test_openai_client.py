@@ -347,3 +347,34 @@ def test_openai_client_uses_filter_policy(monkeypatch, tmp_path):
     assert policy.use_body_key is True, (
         "FilterPolicy must key entries on request body hash"
     )
+
+
+def test_cost_tracker_thread_safe_record():
+    """CostTracker.record must be thread-safe under asyncio.to_thread
+    concurrency (Task 9 uses Semaphore(20) concurrent threads).
+
+    Verify that 10 threads each calling record() 100 times accumulates
+    correctly without lost counts due to non-atomic read-modify-write.
+    """
+    import threading
+
+    tracker = CostTracker()
+    n_threads = 10
+    per_thread = 100
+    barrier = threading.Barrier(n_threads)
+
+    def worker():
+        barrier.wait()  # start all threads as simultaneously as possible
+        for _ in range(per_thread):
+            tracker.record(model="gpt-test", prompt_tokens=1, completion_tokens=1)
+
+    threads = [threading.Thread(target=worker) for _ in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    snap = tracker.snapshot()
+    assert snap["gpt-test"]["prompt_tokens"] == n_threads * per_thread
+    assert snap["gpt-test"]["completion_tokens"] == n_threads * per_thread
+    assert snap["gpt-test"]["calls"] == n_threads * per_thread

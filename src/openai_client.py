@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -107,9 +108,17 @@ def _strictify_schema(node: object) -> None:
 
 @dataclass
 class CostTracker:
-    """Accumulates token counts per model across a pipeline run."""
+    """Accumulates token counts per model across a pipeline run.
+
+    Thread-safe: uses a lock to protect read-modify-write operations.
+    Safe for concurrent record() calls from multiple threads (Task 9
+    uses asyncio.to_thread with Semaphore(20)).
+    """
 
     _by_model: dict[str, dict[str, int]] = field(default_factory=dict)
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, repr=False, compare=False
+    )
 
     def record(
         self,
@@ -118,17 +127,19 @@ class CostTracker:
         prompt_tokens: int,
         completion_tokens: int = 0,
     ) -> None:
-        slot = self._by_model.setdefault(
-            model,
-            {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0},
-        )
-        slot["prompt_tokens"] += prompt_tokens
-        slot["completion_tokens"] += completion_tokens
-        slot["calls"] += 1
+        with self._lock:
+            slot = self._by_model.setdefault(
+                model,
+                {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0},
+            )
+            slot["prompt_tokens"] += prompt_tokens
+            slot["completion_tokens"] += completion_tokens
+            slot["calls"] += 1
 
     def snapshot(self) -> dict[str, dict[str, int]]:
         """Return a shallow-per-model copy so callers cannot mutate state."""
-        return {m: dict(s) for m, s in self._by_model.items()}
+        with self._lock:
+            return {m: dict(s) for m, s in self._by_model.items()}
 
 
 class OpenAIClient:
@@ -292,6 +303,9 @@ class OpenAIClient:
         for the same result. Transport/API errors are retried with
         exponential backoff.
         """
+        if not images:
+            raise ValueError("chat_vision_json requires at least one image")
+
         import base64
 
         messages: list[dict] = []
