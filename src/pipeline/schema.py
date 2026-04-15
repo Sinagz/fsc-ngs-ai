@@ -48,7 +48,7 @@ class FeeCodeRecord(BaseModel):
     """Validated, NGS-mapped fee code record. The canonical type."""
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["1", "2"] = "2"
     province: Province
     fsc_code: str
     fsc_fn: str
