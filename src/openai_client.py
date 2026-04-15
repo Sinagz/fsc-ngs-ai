@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import threading
 import time
 from dataclasses import dataclass, field
@@ -64,6 +65,24 @@ T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R")
 
 _DEFAULT_CACHE = Path(__file__).resolve().parent.parent / ".hishel-cache"
+
+
+def _make_cache_connection(db_path: Path) -> sqlite3.Connection:
+    """Open a SQLite connection configured for concurrent use from multiple
+    ``asyncio.to_thread`` workers.
+
+    - ``check_same_thread=False``: allow cross-thread use (hishel's RLock
+      serializes writes on the Python side).
+    - WAL mode: readers do not block writers; improves concurrent throughput.
+    - ``busy_timeout=30000``: if a writer is briefly blocked, wait up to 30s
+      before raising ``OperationalError: database is locked``. With
+      ``Semaphore(20)`` and short writes (~10-50ms each), 30s is ample.
+    """
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    return conn
 
 
 class _Deterministic(Exception):
@@ -153,8 +172,9 @@ class OpenAIClient:
         cache_path = Path(cache_dir) if cache_dir is not None else _DEFAULT_CACHE
         cache_path.mkdir(parents=True, exist_ok=True)
 
+        db_path = cache_path / "hishel_cache.db"
         storage = hishel.SyncSqliteStorage(
-            database_path=str(cache_path / "hishel_cache.db"),
+            connection=_make_cache_connection(db_path),
         )
         policy = FilterPolicy()
         policy.use_body_key = True

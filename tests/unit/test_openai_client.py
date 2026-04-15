@@ -378,3 +378,61 @@ def test_cost_tracker_thread_safe_record():
     assert snap["gpt-test"]["prompt_tokens"] == n_threads * per_thread
     assert snap["gpt-test"]["completion_tokens"] == n_threads * per_thread
     assert snap["gpt-test"]["calls"] == n_threads * per_thread
+
+
+def test_openai_client_concurrent_cache_writes(monkeypatch, tmp_path):
+    """20 threads writing to the same hishel cache must not deadlock or lose entries."""
+    import json as _json
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from unittest.mock import MagicMock, patch
+
+    from pydantic import BaseModel, ConfigDict
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    client = OpenAIClient(cache_dir=tmp_path / "cache")
+
+    class _Tiny(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        code: str
+
+    # Return a unique response per call so each request is a cache MISS and writes.
+    call_counter = {"n": 0}
+    lock = threading.Lock()
+
+    def _fake_create(**kwargs):
+        with lock:
+            call_counter["n"] += 1
+            n = call_counter["n"]
+        resp = MagicMock()
+        resp.choices = [MagicMock()]
+        resp.choices[0].message.content = _json.dumps({"code": f"R{n:03d}"})
+        resp.usage.prompt_tokens = 10
+        resp.usage.completion_tokens = 5
+        resp.model = "gpt-test"
+        return resp
+
+    with patch.object(client._sdk.chat.completions, "create", side_effect=_fake_create):
+        def _one(i: int):
+            return client.chat_json(
+                prompt=f"request-{i}",  # distinct body -> distinct cache key
+                schema=_Tiny,
+                model="gpt-test",
+            )
+
+        with ThreadPoolExecutor(max_workers=20) as pool:
+            results = list(pool.map(_one, range(20)))
+
+    assert len(results) == 20
+    # Verify WAL mode is configured on the underlying SQLite DB.
+    # (The mock intercepts above the transport layer so hishel never writes
+    # cache entries here; the DB file is created by _make_cache_connection.)
+    import sqlite3
+    db_path = tmp_path / "cache" / "hishel_cache.db"
+    assert db_path.exists(), "hishel cache DB was not created"
+    conn = sqlite3.connect(str(db_path))
+    journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+    assert journal_mode == "wal", (
+        f"Expected WAL journal mode for concurrent writes; got '{journal_mode}'"
+    )
+    conn.close()
