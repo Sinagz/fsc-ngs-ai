@@ -1,0 +1,20 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-04-15T01:35:07.436381+00:00",
+  "git_sha": "cfc177e",
+  "row_counts": {
+    "ON": 0,
+    "BC": 1251,
+    "YT": 0
+  },
+  "source_pdf_hashes": {
+    "ON": "1da8d3669bcdbbea0a929ba095b46a807387d4a8d48153891639620f0ed22b0f",
+    "BC": "eba6c6122d2fa12e2f5ce318e9bf23e98f0baecb366211d08cf1030b47c2afd0",
+    "YT": "43785e4cf0d02679fc95fb7b323872210e2e0344f2fb34e8138be7a056c086fe"
+  },
+  "models": {
+    "embed": "text-embedding-3-large",
+    "extract": "gpt-5.4-mini"
+  },
+  "regression_override": null
+}

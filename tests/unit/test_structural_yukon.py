@@ -27,9 +27,9 @@ def test_code_regex_yt_four_digits():
 def test_extract_yt_row():
     pages = [
         _blk(1, "GENERAL PRACTICE", size=13, y=40),
-        _blk(1, "0615", size=10, y=100, x=72),
-        _blk(1, "Office visit", size=10, y=100, x=140),
-        _blk(1, "55.00", size=10, y=100, x=500),
+        _blk(1, "0615", size=9, y=100, x=72),
+        _blk(1, "Office visit", size=9, y=100, x=140),
+        _blk(1, "55.00", size=9, y=100, x=500),
     ]
     rows = list(YukonExtractor().extract(pages, source_pdf_hash="c" * 64))
     assert len(rows) == 1
@@ -42,9 +42,9 @@ def test_extract_yt_integer_price():
     """YT has integer prices in some sections; must be accepted via Task 6 fix."""
     pages = [
         _blk(1, "GENERAL PRACTICE", size=13, y=40),
-        _blk(1, "0615", size=10, y=100, x=72),
-        _blk(1, "Flat call fee", size=10, y=100, x=140),
-        _blk(1, "110", size=10, y=100, x=500),
+        _blk(1, "0615", size=9, y=100, x=72),
+        _blk(1, "Flat call fee", size=9, y=100, x=140),
+        _blk(1, "110", size=9, y=100, x=500),
     ]
     rows = list(YukonExtractor().extract(pages, source_pdf_hash="c" * 64))
     assert len(rows) == 1

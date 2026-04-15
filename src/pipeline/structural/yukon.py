@@ -1,9 +1,8 @@
 """Yukon Physician Fee Guide — structural extractor.
-Verified against the 2024 edition.
+Verified against the 2024 edition (Nov 2025 reprint).
 
-Subclasses BCExtractor: Yukon's PDF layout closely mirrors BC's (same chapter
-font size 13.0, same body size 10.0). The only distinctive feature is the
-4-digit code regex.
+Subclasses BCExtractor with a 4-digit code regex and a 9.0pt body font
+(BC is 10.0pt; Yukon's typesetting uses the smaller size).
 """
 from __future__ import annotations
 
@@ -19,3 +18,4 @@ YT_CODE_REGEX = re.compile(r"\d{4}")
 class YukonExtractor(BCExtractor):
     PROVINCE: ClassVar[Province] = "YT"
     CODE_REGEX: ClassVar[re.Pattern[str]] = YT_CODE_REGEX
+    BODY_FONT_SIZE: ClassVar[float] = 9.0
