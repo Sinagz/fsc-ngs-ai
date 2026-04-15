@@ -15,7 +15,7 @@ from src.openai_client import OpenAIClient
 from src.pipeline.embed import build_embeddings, save_npz
 from src.pipeline.ngs_mapper import map_ngs
 from src.pipeline.ngs_parser import parse_ngs_docx
-from src.pipeline.regression import check, diff, format_report
+from src.pipeline.regression import check, check_golden_set_invariants, diff, format_report
 from src.pipeline.schema import FeeCodeRecord, Manifest
 from src.pipeline.vision import extract_province as vision_extract_province
 
@@ -192,6 +192,23 @@ def run_pipeline(
                 raise RuntimeError("Regression gate failed:\n" + "\n".join(reasons))
     else:
         logger.info("  no prior version found; skipping regression diff")
+
+    # Golden-set per-field spot-check (runs regardless of whether a prior exists)
+    golden_path = Path("tests/fixtures/golden_codes.json")
+    if golden_path.exists():
+        golden = json.loads(golden_path.read_text(encoding="utf-8"))
+        golden_issues = check_golden_set_invariants(records=records, golden=golden)
+        if golden_issues:
+            if cfg.accept_regression is None:
+                raise RuntimeError(
+                    "Golden-set field invariants failed:\n" + "\n".join(golden_issues)
+                )
+            else:
+                logger.warning(
+                    "Golden-set field invariants failed (overridden): %d issues",
+                    len(golden_issues),
+                )
+
     logger.info("Phase 5 done in %.1fs", time.monotonic() - phase_t0)
 
     # Write outputs

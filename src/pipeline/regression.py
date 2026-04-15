@@ -79,6 +79,61 @@ def check(
     return (len(reasons) == 0, reasons)
 
 
+def check_golden_set_invariants(
+    *,
+    records: list[FeeCodeRecord],
+    golden: list[dict],
+) -> list[str]:
+    """Per-field spot-check against a golden set.
+
+    Policy (see docs/superpowers/plans/2026-04-15-llm-vision-pdf-extraction.md T16):
+    - Missing record = issue.
+    - expected_price present: strict exact match (Decimal). None means record.price must also be None.
+    - expected_price absent: not asserted.
+    - expected_description_contains present: every substring must appear in the description
+      (case-insensitive). Missing substrings are issues.
+    - expected_description_contains absent: not asserted.
+    """
+    from decimal import Decimal
+
+    issues: list[str] = []
+    by_key = {(r.province, r.fsc_code): r for r in records}
+
+    for g in golden:
+        key = (g["province"], g["fsc_code"])
+        rec = by_key.get(key)
+        if rec is None:
+            issues.append(f"golden code {key} missing from records")
+            continue
+
+        # Price check (strict when expected_price key is present)
+        if "expected_price" in g:
+            expected = g["expected_price"]
+            if expected is None:
+                if rec.price is not None:
+                    issues.append(
+                        f"{key}: expected price None, got {rec.price}"
+                    )
+            else:
+                expected_dec = Decimal(expected)
+                if rec.price is None or rec.price != expected_dec:
+                    issues.append(
+                        f"{key}: price expected {expected_dec}, got {rec.price}"
+                    )
+
+        # Description check (case-insensitive, soft — only when key is present)
+        expected_subs = g.get("expected_description_contains")
+        if expected_subs:
+            desc_lower = rec.fsc_description.lower()
+            for sub in expected_subs:
+                if sub.lower() not in desc_lower:
+                    issues.append(
+                        f"{key}: description missing substring '{sub}'"
+                    )
+
+    return issues
+
+
 def format_report(report: DiffReport) -> str:
     lines = ["Provinces:     ON      BC      YT"]
     lines.append(

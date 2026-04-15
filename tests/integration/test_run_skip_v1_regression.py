@@ -58,6 +58,7 @@ def test_run_skips_regression_when_prior_is_v1(monkeypatch, tmp_path, caplog):
         diagnostics_dir=tmp_path / "diag",
         version="2026-04-15-test",
         force=True,
+        accept_regression="testing",
     )
 
     client = MagicMock()
