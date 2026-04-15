@@ -67,3 +67,17 @@ def test_ngs_record_roundtrips():
     n = NGSRecord(ngs_code="1AA", ngs_label="Health exam",
                   ngs_description="routine visit", code_refs=["K040"])
     assert NGSRecord(**n.model_dump()) == n
+
+
+def test_extraction_method_accepts_vision():
+    record = FeeCodeRecord(
+        province="ON",
+        fsc_code="A001",
+        fsc_fn="test",
+        fsc_description="test description",
+        page=1,
+        source_pdf_hash="abc",
+        extraction_method="vision",
+        extraction_confidence=0.95,
+    )
+    assert record.extraction_method == "vision"

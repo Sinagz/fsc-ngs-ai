@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Province = Literal["ON", "BC", "YT"]
-ExtractionMethod = Literal["structural", "semantic"]
+ExtractionMethod = Literal["structural", "semantic", "vision"]
 NGSMethod = Literal["exact", "llm", "manual"]
 
 
