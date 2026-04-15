@@ -59,3 +59,6 @@ htmlcov/
 
 # Hishel cache with recorded request bodies — contains Authorization headers, never commit
 tests/fixtures/vision_cache_dir/*.db
+
+# Internal planning docs (specs, plans) — kept local only
+docs/
