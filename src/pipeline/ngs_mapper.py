@@ -20,6 +20,7 @@ from typing import Protocol
 
 import numpy as np
 from pydantic import BaseModel, Field
+from tqdm.auto import tqdm
 
 from src.pipeline.schema import FeeCodeRecord, NGSRecord
 
@@ -100,7 +101,14 @@ def map_ngs(
     ngs_vecs = arr[len(fee_texts):]
     sims = fee_vecs @ ngs_vecs.T  # (F, N)
 
-    for i, (slot, r) in enumerate(zip(unresolved_slots, unresolved)):
+    iterator = tqdm(
+        enumerate(zip(unresolved_slots, unresolved)),
+        total=len(unresolved),
+        desc="NGS LLM verdicts",
+        unit="code",
+        leave=False,
+    )
+    for i, (slot, r) in iterator:
         top_j = int(np.argmax(sims[i]))
         top_sim = float(sims[i, top_j])
         if top_sim < SIMILARITY_THRESHOLD:

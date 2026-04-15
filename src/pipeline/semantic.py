@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
 from pydantic import BaseModel, Field
+from tqdm.auto import tqdm
 
 from src.pipeline.schema import CandidateRow
 
@@ -48,6 +49,7 @@ def rescue(
     model: str,
     context_lines: dict[tuple[int, str], str],
     threshold: float = 0.8,
+    desc: str = "LLM rescue",
 ) -> tuple[list[CandidateRow], list[CandidateRow]]:
     """Return (rescued_rows, unresolved_rows).
 
@@ -58,7 +60,7 @@ def rescue(
     """
     rescued: list[CandidateRow] = []
     unresolved: list[CandidateRow] = []
-    for row in rows:
+    for row in tqdm(rows, desc=desc, unit="row", leave=False):
         if row.confidence >= threshold:
             rescued.append(row)
             continue

@@ -4,6 +4,7 @@ Run with:  python -m src.cli run [--version 2026-04-14] [--force]
 """
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 from pathlib import Path
@@ -15,6 +16,15 @@ from src.openai_client import OpenAIClient
 from src.pipeline.run import PipelineConfig, run_pipeline
 
 app = typer.Typer(help="FSC-NGS pipeline CLI", no_args_is_help=True)
+
+
+def _configure_logging(verbose: bool = False) -> None:
+    """Configure root logger once per CLI invocation."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -47,8 +57,12 @@ def run(
         "--embed-dim",
         help="Embedding dimension (overrides OPENAI_EMBED_DIM env var)",
     ),
+    verbose: bool = typer.Option(
+        False, "-v", "--verbose", help="DEBUG-level logging (default: INFO)"
+    ),
 ) -> None:
-    """Run the full extraction → mapping → embedding pipeline."""
+    """Run the full extraction -> mapping -> embedding pipeline."""
+    _configure_logging(verbose=verbose)
     load_dotenv()
     embed_model = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-large")
     extract_model = os.environ.get("OPENAI_EXTRACT_MODEL", "gpt-5.4-mini")

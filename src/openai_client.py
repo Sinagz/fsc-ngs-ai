@@ -57,6 +57,7 @@ from hishel._policies import FilterPolicy
 from hishel.httpx import SyncCacheTransport
 from openai import OpenAI
 from pydantic import BaseModel, ValidationError
+from tqdm.auto import tqdm
 
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R")
@@ -250,7 +251,14 @@ class OpenAIClient:
         not guarantee response ordering matches input order.
         """
         out: list[list[float]] = []
-        for i in range(0, len(texts), batch_size):
+        total_batches = (len(texts) + batch_size - 1) // batch_size
+        iterator = range(0, len(texts), batch_size)
+        if total_batches > 1:
+            iterator = tqdm(
+                iterator, total=total_batches, desc="Embeddings",
+                unit="batch", leave=False,
+            )
+        for i in iterator:
             batch = texts[i : i + batch_size]
 
             def _call(b: list[str] = batch) -> None:

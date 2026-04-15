@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +21,12 @@ from src.pipeline.structural.bc import BCExtractor
 from src.pipeline.structural.ontario import OntarioExtractor
 from src.pipeline.structural.yukon import YukonExtractor
 from src.pipeline.validate import validate
+
+logger = logging.getLogger(__name__)
+
+
+def _tokens(snapshot: dict[str, dict[str, int]]) -> int:
+    return sum(s["prompt_tokens"] + s["completion_tokens"] for s in snapshot.values())
 
 PROVINCE_EXTRACTORS = {
     "ON": OntarioExtractor(),
@@ -77,6 +85,7 @@ def run_pipeline(
     manifest_path = version_dir / "manifest.json"
 
     if not cfg.force and codes_path.exists() and manifest_path.exists():
+        logger.info("Skipping: artifacts already at %s (use --force to redo)", version_dir)
         return PipelineResult(skipped=True, version_dir=version_dir, manifest=None)
 
     if client is None:
@@ -90,34 +99,51 @@ def run_pipeline(
     for name in ("unresolved.jsonl", "validation_rejects.jsonl"):
         (cfg.diagnostics_dir / name).unlink(missing_ok=True)
 
-    # Extract + rescue per province
+    t0 = time.monotonic()
+    logger.info("Pipeline started (version=%s, force=%s)", cfg.version, cfg.force)
+
+    # Phase 1: Extract + rescue per province
+    logger.info("Phase 1/5: Structural extraction + LLM rescue (per province)")
+    phase_t0 = time.monotonic()
     all_candidates = []
     pdf_hashes: dict[str, str] = {}
     context_lines: dict[tuple[int, str], str] = {}
     for province, extractor in PROVINCE_EXTRACTORS.items():
         pdf = _province_pdf(cfg.raw_pdf_dir, province)
         if pdf is None:
+            logger.warning("  [%s] no PDF found; skipping", province)
             continue
+        logger.info("  [%s] loading %s", province, pdf.name)
         h = pdf_hash(pdf)
         pdf_hashes[province] = h
         pages = load_pdf(pdf)
         rows = list(extractor.extract(pages, source_pdf_hash=h))
-        # For now, context = empty; rescue can be enriched later
+        low_conf = sum(1 for r in rows if r.confidence < 0.8)
+        logger.info("  [%s] %d candidate rows (%d need LLM rescue)",
+                    province, len(rows), low_conf)
         rescued, unresolved = rescue(
             rows,
             client=client,
             model=cfg.extract_model,
             context_lines=context_lines,
             threshold=0.8,
+            desc=f"Rescue {province}",
         )
         _write_jsonl(
             cfg.diagnostics_dir / "unresolved.jsonl",
             [r.model_dump(mode="json") for r in unresolved],
             append=True,
         )
+        logger.info("  [%s] rescued=%d unresolved=%d", province,
+                    len(rescued), len(unresolved))
         all_candidates.extend(rescued)
+    logger.info("Phase 1 done in %.1fs (%d total candidates, tokens so far: %d)",
+                time.monotonic() - phase_t0, len(all_candidates),
+                _tokens(client.costs.snapshot()))
 
-    # Validate
+    # Phase 2: Validate
+    logger.info("Phase 2/5: Validation")
+    phase_t0 = time.monotonic()
     records, rejects = validate(all_candidates)
     _write_jsonl(
         cfg.diagnostics_dir / "validation_rejects.jsonl",
@@ -126,11 +152,17 @@ def run_pipeline(
             for e in rejects
         ],
     )
+    logger.info("Phase 2 done in %.1fs (accepted=%d rejected=%d)",
+                time.monotonic() - phase_t0, len(records), len(rejects))
 
-    # NGS mapping
+    # Phase 3: NGS mapping
+    logger.info("Phase 3/5: NGS mapping (exact -> semantic+LLM verdict)")
+    phase_t0 = time.monotonic()
     ngs_records = []
     for docx_path in sorted(cfg.raw_docx_dir.glob("*.docx")):
         ngs_records.extend(parse_ngs_docx(docx_path))
+    logger.info("  loaded %d NGS categories from %s",
+                len(ngs_records), cfg.raw_docx_dir)
     records = map_ngs(
         records,
         ngs_records,
@@ -139,26 +171,41 @@ def run_pipeline(
         llm_model=cfg.extract_model,
         dim=cfg.embed_dim,
     )
+    mapped = sum(1 for r in records if r.NGS_code)
+    logger.info("Phase 3 done in %.1fs (%d/%d codes mapped, tokens so far: %d)",
+                time.monotonic() - phase_t0, mapped, len(records),
+                _tokens(client.costs.snapshot()))
+
     # Sort once here. codes.json and embeddings.npz are written with positional
     # correspondence (row i in codes.json == row i in .npz). Any filter or reorder
     # AFTER this point and BEFORE build_embeddings() would silently desync the two.
     records.sort(key=lambda r: (r.province, r.fsc_code))
 
-    # Embeddings
+    # Phase 4: Embeddings
+    logger.info("Phase 4/5: Embeddings (%d records -> %s @ %d dim)",
+                len(records), cfg.embed_model, cfg.embed_dim)
+    phase_t0 = time.monotonic()
     emb_arr, ids = build_embeddings(
         records, client=client, model=cfg.embed_model, dim=cfg.embed_dim
     )
     save_npz(embeddings_path, emb_arr, ids)
+    logger.info("Phase 4 done in %.1fs", time.monotonic() - phase_t0)
 
-    # Regression
+    # Phase 5: Regression
+    logger.info("Phase 5/5: Regression check")
+    phase_t0 = time.monotonic()
     previous = _latest_previous(cfg.output_dir, cfg.version)
     if previous is not None:
+        logger.info("  comparing against %s", previous.parent.name)
         old_records = [FeeCodeRecord(**d) for d in json.loads(previous.read_text())]
         report = diff(new=records, old=old_records)
         ok, reasons = check(report, golden_set=set(cfg.golden_set))
         (cfg.diagnostics_dir / "regression_diff.txt").write_text(format_report(report))
         if not ok and cfg.accept_regression is None:
             raise RuntimeError("Regression gate failed:\n" + "\n".join(reasons))
+    else:
+        logger.info("  no prior version found; skipping regression diff")
+    logger.info("Phase 5 done in %.1fs", time.monotonic() - phase_t0)
 
     # Write outputs
     codes_path.write_text(
@@ -180,9 +227,15 @@ def run_pipeline(
     manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
 
     # Cost diagnostics
-    (cfg.diagnostics_dir / "costs.json").write_text(
-        json.dumps(client.costs.snapshot(), indent=2)
+    costs = client.costs.snapshot()
+    (cfg.diagnostics_dir / "costs.json").write_text(json.dumps(costs, indent=2))
+    logger.info(
+        "Pipeline complete in %.1fs | rows=%s | tokens=%d | output=%s",
+        time.monotonic() - t0, row_counts, _tokens(costs), version_dir,
     )
+    for model, s in costs.items():
+        logger.info("  %s: %d calls, %d prompt + %d completion tokens",
+                    model, s["calls"], s["prompt_tokens"], s["completion_tokens"])
 
     return PipelineResult(skipped=False, version_dir=version_dir, manifest=manifest)
 

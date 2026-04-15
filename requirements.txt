@@ -5,6 +5,7 @@ python-docx>=1.1
 rapidfuzz>=3.6
 pydantic>=2.7
 python-dotenv>=1.0
+tqdm>=4.66
 
 # OpenAI (extraction rescue, embeddings, reranking in Phase 2)
 openai>=1.30,<2
